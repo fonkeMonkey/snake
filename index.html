@@ -90,6 +90,31 @@
     #btn-left  { top: 42px; left: 0; }
     #btn-right { top: 42px; right: 0; }
     #instructions { margin-top: 8px; font-size: 0.68rem; color: #444; letter-spacing: 0.05em; }
+    #stamina-wrap {
+      width: 400px;
+      margin-top: 7px;
+    }
+    #stamina-label {
+      font-size: 0.62rem;
+      color: #555;
+      letter-spacing: 0.06em;
+      margin-bottom: 3px;
+      transition: color 0.15s;
+    }
+    #stamina-track {
+      background: #1e1e3a;
+      height: 6px;
+      border-radius: 3px;
+      border: 1px solid #2a2a4a;
+      overflow: hidden;
+    }
+    #stamina-fill {
+      height: 100%;
+      width: 100%;
+      background: #facc15;
+      border-radius: 3px;
+      transition: background 0.2s;
+    }
     @media (hover: none) and (pointer: coarse) {
       #dpad { display: block; }
       #instructions { display: none; }
@@ -106,17 +131,22 @@
   <div id="meta">
     <span id="difficulty-label">MEDIUM</span>
     <button class="meta-btn" id="walls-toggle">WALLS: ON</button>
+    <button class="meta-btn" id="maze-toggle">MAZE: OFF</button>
     <button class="meta-btn" id="theme-toggle">THEME: NEON</button>
     <button class="meta-btn" id="mode-toggle">1 PLAYER</button>
   </div>
   <canvas id="game" width="400" height="400"></canvas>
+  <div id="stamina-wrap">
+    <div id="stamina-label">BOOST [SHIFT]</div>
+    <div id="stamina-track"><div id="stamina-fill"></div></div>
+  </div>
   <div id="dpad">
     <button id="btn-up">▲</button>
     <button id="btn-left">◀</button>
     <button id="btn-right">▶</button>
     <button id="btn-down">▼</button>
   </div>
-  <div id="instructions">WASD / ARROWS &nbsp;|&nbsp; P = pause &nbsp;|&nbsp; SPACE / ENTER = restart</div>
+  <div id="instructions">WASD / ARROWS &nbsp;|&nbsp; SHIFT = boost &nbsp;|&nbsp; P = pause &nbsp;|&nbsp; SPACE / ENTER = restart</div>
 
   <script>
     const canvas = document.getElementById('game');
@@ -125,11 +155,13 @@
     const highScoreEl  = document.getElementById('high-score');
     const diffLabel    = document.getElementById('difficulty-label');
     const wallsBtn     = document.getElementById('walls-toggle');
+    const mazeBtn      = document.getElementById('maze-toggle');
     const themeBtn     = document.getElementById('theme-toggle');
     const modeBtn      = document.getElementById('mode-toggle');
 
     const COLS = 20, ROWS = 20, CELL = 20;
     const MIN_SPEED = 60;
+    const STAMINA_MAX = 100;
 
     // ── Themes ───────────────────────────────────────────────────
     const THEMES = [
@@ -157,6 +189,7 @@
     let difficulty = 'medium';
     let wallsOn = true;
     let twoPlayer = false;
+    let mazeMode = false;
 
     // ── State ─────────────────────────────────────────────────────
     let snake, dir, nextDir;
@@ -166,9 +199,51 @@
     let gameOver, paused, shielded, shield2;
     let intervalId, countdownVal;
     let flashFrames = 0, deathFrames = 0;
+    let shakeFrames = 0;
     let particles = [];
     let milestone = null; // { text, alpha }
     let winner = null; // for 2p
+    let stamina = STAMINA_MAX, shiftHeld = false;
+    let moveHistory = [], ghostFrames = [], ghostIdx = 0;
+    let combo = 1, comboTimer = null, comboAlpha = 0;
+    let toastQueue = [];
+
+    const ACHIEVEMENTS = [
+      { id:'first_blood',  label:'First Blood',   desc:'Eat your first food',          icon:'🍎' },
+      { id:'speed_demon',  label:'Speed Demon',   desc:'Use boost 10 times',            icon:'⚡' },
+      { id:'big_eater',    label:'Big Eater',     desc:'Eat 20 foods in one game',      icon:'🐍' },
+      { id:'combo_king',   label:'Combo King',    desc:'Hit a ×5 combo',                icon:'🔥' },
+      { id:'untouchable',  label:'Untouchable',   desc:'Score 200+ without dying',      icon:'🛡️' },
+      { id:'power_junkie', label:'Power Junkie',  desc:'Collect 5 power-ups in one game', icon:'💊' },
+      { id:'centurion',    label:'Centurion',     desc:'Score 100 points',              icon:'💯' },
+      { id:'maze_runner',  label:'Maze Runner',   desc:'Score 50 in Maze mode',         icon:'🌀' },
+    ];
+
+    let boostUses = 0, powerUpsCollected = 0;
+
+    function getUnlocked() {
+      try { return new Set(JSON.parse(localStorage.getItem('snakeAch') || '[]')); } catch { return new Set(); }
+    }
+    function unlockAchievement(id) {
+      const unlocked = getUnlocked();
+      if (unlocked.has(id)) return;
+      unlocked.add(id);
+      localStorage.setItem('snakeAch', JSON.stringify([...unlocked]));
+      const ach = ACHIEVEMENTS.find(a => a.id === id);
+      if (ach) showToast(`${ach.icon} ${ach.label}: ${ach.desc}`);
+    }
+    function showToast(msg) {
+      toastQueue.push({ msg, alpha: 1 });
+    }
+    function checkAchievements() {
+      if (foodCount >= 1)          unlockAchievement('first_blood');
+      if (foodCount >= 20)         unlockAchievement('big_eater');
+      if (combo >= 5)              unlockAchievement('combo_king');
+      if (score >= 100)            unlockAchievement('centurion');
+      if (score >= 200)            unlockAchievement('untouchable');
+      if (powerUpsCollected >= 5)  unlockAchievement('power_junkie');
+      if (mazeMode && score >= 50) unlockAchievement('maze_runner');
+    }
 
     // ── Audio ─────────────────────────────────────────────────────
     let audioCtx;
@@ -194,6 +269,27 @@
     const playPowerUp  = () => playTone(600, 1200, 0.15);
     const playCountdown = (n) => playTone(n === 0 ? 880 : 440, n === 0 ? 1200 : 440, 0.1);
 
+    // ── Speed / Stamina ───────────────────────────────────────────
+    function getBaseSpeed() {
+      const diff = DIFFICULTIES[difficulty];
+      return Math.max(MIN_SPEED, diff.speed - Math.floor(foodCount / 5) * diff.step);
+    }
+    function getActiveSpeed() {
+      if (shiftHeld && stamina > 0) return Math.max(Math.floor(MIN_SPEED / 2), Math.floor(getBaseSpeed() / 2));
+      return getBaseSpeed();
+    }
+    function restartInterval(overrideMs) {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(tick, overrideMs !== undefined ? overrideMs : getActiveSpeed());
+    }
+    function updateStaminaBar() {
+      const fill = document.getElementById('stamina-fill');
+      const label = document.getElementById('stamina-label');
+      fill.style.width = stamina + '%';
+      fill.style.background = stamina > 60 ? '#facc15' : stamina > 25 ? '#f97316' : '#ef4444';
+      label.style.color = (shiftHeld && stamina > 0) ? '#facc15' : '#555';
+    }
+
     // ── Init ──────────────────────────────────────────────────────
     function init() {
       snake  = [{ x:10,y:10 }, { x:9,y:10 }, { x:8,y:10 }];
@@ -207,9 +303,19 @@
       score = 0; foodCount = 0;
       gameOver = false; paused = false;
       shielded = false; shield2 = false;
-      flashFrames = 0; deathFrames = 0;
+      flashFrames = 0; deathFrames = 0; shakeFrames = 0;
       particles = []; powerUp = null; obstacles = [];
       milestone = null; winner = null;
+      if (mazeMode) generateMaze();
+      stamina = STAMINA_MAX; shiftHeld = false;
+      updateStaminaBar();
+      combo = 1; comboAlpha = 0;
+      if (comboTimer) { clearTimeout(comboTimer); comboTimer = null; }
+      boostUses = 0; powerUpsCollected = 0; toastQueue = [];
+      moveHistory = [];
+      ghostIdx = 0;
+      // Load best ghost from localStorage
+      try { ghostFrames = JSON.parse(localStorage.getItem('snakeGhost') || '[]'); } catch { ghostFrames = []; }
       highScore = parseInt(localStorage.getItem('snakeHigh') || '0');
       scoreEl.textContent = score;
       highScoreEl.textContent = highScore;
@@ -229,7 +335,7 @@
         if (countdownVal <= 0) {
           clearInterval(cd);
           countdownVal = null;
-          intervalId = setInterval(tick, DIFFICULTIES[difficulty].speed);
+          restartInterval();
         }
       }, 800);
     }
@@ -263,14 +369,33 @@
 
     function maybePowerUp() {
       if (!powerUp && Math.random() < 0.2) {
-        const types = ['slow','bonus','shield'];
-        powerUp = { ...randomEmpty(), type: types[Math.floor(Math.random()*3)], ttl: 80 };
+        const types = ['slow','bonus','shield','shrink'];
+        powerUp = { ...randomEmpty(), type: types[Math.floor(Math.random()*types.length)], ttl: 80 };
       }
     }
 
     function maybeObstacle() {
-      if (foodCount > 0 && foodCount % 3 === 0 && obstacles.length < 12) {
+      if (!mazeMode && foodCount > 0 && foodCount % 3 === 0 && obstacles.length < 12) {
         obstacles.push(randomEmpty());
+      }
+    }
+
+    function generateMaze() {
+      obstacles = [];
+      const safe = new Set();
+      // Keep center area and spawn zones clear
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) safe.add(`${10+dx},${10+dy}`);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) safe.add(`${10+dx},${12+dy}`);
+      // Add ~25 random wall segments in clusters
+      const wallCount = 22 + Math.floor(Math.random() * 8);
+      let attempts = 0;
+      while (obstacles.length < wallCount && attempts++ < 500) {
+        const x = 1 + Math.floor(Math.random() * (COLS - 2));
+        const y = 1 + Math.floor(Math.random() * (ROWS - 2));
+        const key = `${x},${y}`;
+        if (!safe.has(key) && !obstacles.some(o => o.x === x && o.y === y)) {
+          obstacles.push({ x, y });
+        }
       }
     }
 
@@ -347,6 +472,9 @@
       dir  = nextDir;
       if (twoPlayer) dir2 = nextDir2;
 
+      // Record snake state for ghost replay
+      if (!twoPlayer) moveHistory.push(snake.map(s => ({ ...s })));
+
       const r1 = moveSnake(snake, dir, true);
       if (r1 === 'dead') { winner = twoPlayer ? 'P2' : null; triggerDeath(); return; }
       if (r1 === 'bounce') { /* skip grow */ } else {
@@ -364,21 +492,41 @@
         if (powerUp.ttl <= 0) powerUp = null;
       }
 
+      // Stamina: drain while boosting, recharge otherwise
+      if (shiftHeld && stamina > 0) {
+        stamina = Math.max(0, stamina - 2.5);
+        if (stamina === 0) restartInterval(); // drop boost speed
+      } else if (!shiftHeld && stamina < STAMINA_MAX) {
+        stamina = Math.min(STAMINA_MAX, stamina + 1);
+      }
+      updateStaminaBar();
+
       updateParticles();
       if (milestone) {
         milestone.alpha -= 0.018;
         if (milestone.alpha <= 0) milestone = null;
       }
+      if (comboAlpha > 0) comboAlpha = Math.max(0, comboAlpha - 0.015);
+      toastQueue.forEach(t => t.alpha = Math.max(0, t.alpha - 0.008));
+      toastQueue = toastQueue.filter(t => t.alpha > 0);
       if (flashFrames > 0) flashFrames--;
+      if (!twoPlayer && ghostFrames.length) ghostIdx = Math.min(ghostIdx + 1, ghostFrames.length - 1);
       draw();
     }
 
     function handleHead(snk, head, isP1) {
       // food
       if (head.x === food.x && head.y === food.y) {
-        score += 10;
+        // Combo multiplier
+        if (comboTimer) clearTimeout(comboTimer);
+        else combo = 1; // first eat resets (handled below)
+        comboAlpha = 1;
+        comboTimer = setTimeout(() => { combo = 1; comboTimer = null; comboAlpha = 0; }, 3000);
+        score += 10 * combo;
+        combo = Math.min(combo + 1, 8);
         foodCount++;
         checkMilestone(score);
+        checkAchievements();
         scoreEl.textContent = score;
         if (score > highScore) {
           highScore = score;
@@ -391,30 +539,19 @@
         playEat();
         flashFrames = 3;
         spawnParticles(head.x, head.y, THEMES[themeIdx].accent);
-        if (foodCount % 5 === 0) {
-          clearInterval(intervalId);
-          const diff = DIFFICULTIES[difficulty];
-          const newSpeed = Math.max(MIN_SPEED, diff.speed - Math.floor(foodCount / 5) * diff.step);
-          intervalId = setInterval(tick, newSpeed);
-        }
+        if (foodCount % 5 === 0) restartInterval();
       } else {
         snk.pop();
       }
       // power-up
       if (powerUp && head.x === powerUp.x && head.y === powerUp.y) {
         playPowerUp();
+        powerUpsCollected++;
+        checkAchievements();
         spawnParticles(head.x, head.y, powerUpColor(powerUp.type));
         if (powerUp.type === 'slow') {
-          clearInterval(intervalId);
-          intervalId = setInterval(tick, Math.min(300, DIFFICULTIES[difficulty].speed + 80));
-          setTimeout(() => {
-            if (!gameOver) {
-              clearInterval(intervalId);
-              const diff = DIFFICULTIES[difficulty];
-              const spd = Math.max(MIN_SPEED, diff.speed - Math.floor(foodCount / 5) * diff.step);
-              intervalId = setInterval(tick, spd);
-            }
-          }, 5000);
+          restartInterval(Math.min(300, getBaseSpeed() + 80));
+          setTimeout(() => { if (!gameOver) restartInterval(); }, 5000);
         } else if (powerUp.type === 'bonus') {
           score += 30; scoreEl.textContent = score;
           if (score > highScore) {
@@ -424,19 +561,29 @@
           }
         } else if (powerUp.type === 'shield') {
           if (isP1) shielded = true; else shield2 = true;
+        } else if (powerUp.type === 'shrink') {
+          const snk = isP1 ? snake : snake2;
+          const removed = Math.min(3, snk.length - 1);
+          snk.splice(snk.length - removed, removed);
+          // Spawn shrink particles on each removed tail position
+          for (let i = 0; i < removed; i++) spawnParticles(snk[snk.length - 1].x, snk[snk.length - 1].y, '#f472b6');
         }
         powerUp = null;
       }
     }
 
     function powerUpColor(type) {
-      return type === 'slow' ? '#38bdf8' : type === 'bonus' ? '#facc15' : '#a78bfa';
+      if (type === 'slow')   return '#38bdf8';
+      if (type === 'bonus')  return '#facc15';
+      if (type === 'shrink') return '#f472b6';
+      return '#a78bfa'; // shield
     }
 
     // ── Death ─────────────────────────────────────────────────────
     function triggerDeath() {
       playDeath();
       deathFrames = 6;
+      shakeFrames = 10;
       let f = 0;
       const anim = setInterval(() => {
         f++; draw();
@@ -447,6 +594,11 @@
 
     function endGame() {
       gameOver = true;
+      // Save ghost if this is the best run
+      if (!twoPlayer && moveHistory.length > ghostFrames.length) {
+        try { localStorage.setItem('snakeGhost', JSON.stringify(moveHistory)); } catch {}
+        ghostFrames = moveHistory;
+      }
       checkLeaderboard();
       draw();
       drawOverlay();
@@ -472,8 +624,20 @@
     // ── Draw ──────────────────────────────────────────────────────
     function draw() {
       const t = THEMES[themeIdx];
+
+      // Screen shake
+      ctx.save();
+      if (shakeFrames > 0) {
+        shakeFrames--;
+        const mag = shakeFrames * 1.2;
+        ctx.translate(
+          (Math.random() * 2 - 1) * mag,
+          (Math.random() * 2 - 1) * mag
+        );
+      }
+
       ctx.fillStyle = t.bg;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(-10, -10, canvas.width + 20, canvas.height + 20);
 
       if (flashFrames > 0) {
         ctx.fillStyle = `rgba(${t.body},${flashFrames * 0.07})`;
@@ -497,10 +661,11 @@
         ctx.fillRect(o.x*CELL+4, o.y*CELL+4, CELL-8, CELL-8);
       });
 
-      // Food
+      // Food (with wobble)
+      const wobble = Math.sin(Date.now() / 220) * 1.2;
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
-      ctx.arc(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2);
+      ctx.ellipse(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2+wobble, CELL/2-2-wobble*0.5, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.beginPath();
@@ -520,9 +685,22 @@
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 11px Courier New';
         ctx.textAlign = 'center';
-        ctx.fillText(powerUp.type === 'slow' ? 'S' : powerUp.type === 'bonus' ? '$' : '★',
+        const puIcon = { slow:'S', bonus:'$', shield:'★', shrink:'↓' };
+        ctx.fillText(puIcon[powerUp.type] || '?',
           powerUp.x*CELL+CELL/2, powerUp.y*CELL+CELL/2+4);
         ctx.textAlign = 'left';
+      }
+
+      // Ghost snake (best run replay)
+      if (!twoPlayer && ghostFrames.length > ghostIdx) {
+        const gFrame = ghostFrames[ghostIdx];
+        ctx.globalAlpha = 0.18;
+        gFrame.forEach((seg, i) => {
+          ctx.fillStyle = i === 0 ? '#fff' : '#aaa';
+          const pad = i === 0 ? 1 : 2;
+          ctx.beginPath(); ctx.roundRect(seg.x*CELL+pad, seg.y*CELL+pad, CELL-pad*2, CELL-pad*2, i===0?4:3); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
       }
 
       // Snakes
@@ -549,17 +727,44 @@
         ctx.textAlign = 'left';
       }
 
+      // Combo indicator
+      if (combo > 1 && comboAlpha > 0) {
+        ctx.globalAlpha = comboAlpha;
+        ctx.textAlign = 'right';
+        ctx.font = `bold ${16 + combo * 2}px Courier New`;
+        ctx.fillStyle = '#facc15';
+        ctx.fillText(`×${combo} COMBO`, canvas.width - 8, 22);
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+      }
+
       // Countdown
       if (countdownVal !== null) drawCountdown(countdownVal);
 
       // Pause
       if (paused) drawPause();
 
+      // Achievement toasts
+      toastQueue.forEach((t, i) => {
+        const y = canvas.height - 30 - i * 28;
+        ctx.globalAlpha = t.alpha;
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.beginPath(); ctx.roundRect(8, y - 14, canvas.width - 16, 22, 4); ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.font = 'bold 11px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(t.msg, canvas.width / 2, y + 2);
+        ctx.textAlign = 'left';
+        ctx.globalAlpha = 1;
+      });
+
       // Shield indicator
       if (shielded) {
         ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 3;
         ctx.strokeRect(2, 2, canvas.width-4, canvas.height-4);
       }
+
+      ctx.restore();
     }
 
     function drawSnakeBody(snk, d, t, dying, shld, accentCol) {
@@ -571,10 +776,20 @@
         } else {
           ctx.fillStyle = i === 0 ? t.head : `rgba(${t.body},${Math.max(0.4, 1 - i/snk.length*0.6)})`;
         }
-        const pad = i === 0 ? 1 : 2;
-        ctx.beginPath();
-        ctx.roundRect(seg.x*CELL+pad, seg.y*CELL+pad, CELL-pad*2, CELL-pad*2, i===0?4:3);
-        ctx.fill();
+        if (i === 0 && !dying) {
+          // Head squash/stretch in direction of travel
+          const stretch = 2.5;
+          const sx = d.x !== 0 ? stretch : -stretch * 0.5;
+          const sy = d.y !== 0 ? stretch : -stretch * 0.5;
+          ctx.beginPath();
+          ctx.roundRect(seg.x*CELL+1-sx, seg.y*CELL+1-sy, CELL-2+sx*2, CELL-2+sy*2, 4);
+          ctx.fill();
+        } else {
+          const pad = i === 0 ? 1 : 2;
+          ctx.beginPath();
+          ctx.roundRect(seg.x*CELL+pad, seg.y*CELL+pad, CELL-pad*2, CELL-pad*2, i===0?4:3);
+          ctx.fill();
+        }
       });
       if (!dying) {
         const h = snk[0];
@@ -677,6 +892,12 @@
       wallsBtn.textContent = `WALLS: ${wallsOn ? 'ON' : 'OFF'}`;
     });
 
+    mazeBtn.addEventListener('click', () => {
+      mazeMode = !mazeMode;
+      mazeBtn.textContent = `MAZE: ${mazeMode ? 'ON' : 'OFF'}`;
+      init();
+    });
+
     themeBtn.addEventListener('click', () => {
       themeIdx = (themeIdx + 1) % THEMES.length;
       localStorage.setItem('snakeTheme', themeIdx);
@@ -690,7 +911,25 @@
     });
 
     // ── Input ─────────────────────────────────────────────────────
+    document.addEventListener('keyup', e => {
+      if (e.key === 'Shift' && shiftHeld) {
+        shiftHeld = false;
+        if (!gameOver && countdownVal === null && !paused) restartInterval();
+        updateStaminaBar();
+      }
+    });
+
     document.addEventListener('keydown', e => {
+      if (e.key === 'Shift' && !shiftHeld && !gameOver && countdownVal === null && !paused) {
+        shiftHeld = true;
+        if (stamina > 0) {
+          restartInterval();
+          boostUses++;
+          if (boostUses >= 10) unlockAchievement('speed_demon');
+        }
+        updateStaminaBar();
+        return;
+      }
       if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') {
         if (!gameOver && countdownVal === null) {
           paused = !paused;
@@ -753,9 +992,16 @@
     document.getElementById('btn-left').addEventListener('touchstart',  e => { e.preventDefault(); pressDir(-1,0); }, {passive:false});
     document.getElementById('btn-right').addEventListener('touchstart', e => { e.preventDefault(); pressDir(1,0);  }, {passive:false});
 
+    // Idle animation loop (food wobble, power-up pulse redraw)
+    function idleDraw() {
+      if (!gameOver && !paused && countdownVal === null) draw();
+      requestAnimationFrame(idleDraw);
+    }
+
     applyTheme();
     updateDiffLabel();
     init();
+    requestAnimationFrame(idleDraw);
   </script>
 </body>
 </html>

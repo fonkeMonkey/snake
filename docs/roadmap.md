@@ -96,3 +96,38 @@
 - Two snakes: Player 1 (WASD, green) and Player 2 (arrows, blue)
 - Both on same canvas, last alive wins
 - Round winner shown on game over overlay
+
+## Feature 21: Speed Burst
+- Hold Shift to temporarily boost snake speed (2x)
+- Stamina bar shown below canvas; depletes while boosting, recharges when released
+- Boost unavailable when stamina is empty
+
+## Feature 22: Ghost Snake
+- After each game, save the full move history in localStorage
+- On next game, render a semi-transparent ghost replay of the best run
+- Ghost doesn't interact with the live snake — purely visual
+
+## Feature 23: Shrink Power-up
+- New pink power-up that removes the last 3 segments from the snake
+- Useful as an escape when near self-collision
+- Briefly animates the segments shrinking away
+
+## Feature 24: Maze Mode
+- Toggle-able mode that procedurally generates a maze of wall segments at game start
+- Maze is regenerated each new game
+- Works with existing walls/wrap toggle
+
+## Feature 25: Combo Multiplier
+- Eating food within 3 seconds of the last eat increments a combo counter (x2, x3…)
+- Score multiplied by combo value; combo resets after 3s of not eating
+- Combo counter displayed prominently, pulses on increment
+
+## Feature 26: Achievements
+- 8 in-game achievements (e.g. "First Blood", "Speed Demon", "Untouchable", "Big Eater")
+- Unlocked achievements stored in localStorage
+- Toast notification appears on unlock; view all on a new Achievements panel
+
+## Feature 27: Screenshake & Juice
+- Screen shakes briefly on death
+- Snake head squashes/stretches in direction of travel
+- Food wobbles in place with a subtle idle animation
