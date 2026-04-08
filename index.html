@@ -44,7 +44,7 @@
     #settings-label {
       font-size: 0.6rem;
       letter-spacing: 0.18em;
-      color: #555;
+      color: #888;
       text-transform: uppercase;
       margin-bottom: 7px;
     }
@@ -59,8 +59,8 @@
     }
     .meta-btn {
       background: #1a1a3a;
-      border: 1px solid #3a3a5a;
-      color: #bbb;
+      border: 1px solid #4a4a6a;
+      color: #ddd;
       font-family: 'Courier New', monospace;
       font-size: 0.72rem;
       padding: 5px 11px;
@@ -102,14 +102,14 @@
     #btn-down  { bottom: 0; left: 42px; }
     #btn-left  { top: 42px; left: 0; }
     #btn-right { top: 42px; right: 0; }
-    #instructions { margin-top: 8px; font-size: 0.68rem; color: #444; letter-spacing: 0.05em; }
+    #instructions { margin-top: 8px; font-size: 0.68rem; color: #777; letter-spacing: 0.05em; }
     #stamina-wrap {
       width: 400px;
       margin-top: 7px;
     }
     #stamina-label {
       font-size: 0.62rem;
-      color: #666;
+      color: #999;
       letter-spacing: 0.06em;
       margin-bottom: 3px;
       transition: color 0.15s;
@@ -385,7 +385,7 @@
       const label = document.getElementById('stamina-label');
       fill.style.width = stamina + '%';
       fill.style.background = stamina > 60 ? '#facc15' : stamina > 25 ? '#f97316' : '#ef4444';
-      label.style.color = (shiftHeld && stamina > 0) ? '#facc15' : '#666';
+      label.style.color = (shiftHeld && stamina > 0) ? '#facc15' : '#999';
     }
 
     // ── Init ──────────────────────────────────────────────────────
@@ -1139,9 +1139,9 @@
       ctx.font = `bold ${n === 0 ? 60 : 80}px Courier New`;
       ctx.fillText(n === 0 ? 'GO!' : n, canvas.width/2, canvas.height/2 + 28);
       if (n > 0) {
-        ctx.fillStyle = '#555';
-        ctx.font = '11px Courier New';
-        ctx.fillText('hold SHIFT to sprint', canvas.width/2, canvas.height/2 + 58);
+        ctx.fillStyle = '#aaa';
+        ctx.font = '12px Courier New';
+        ctx.fillText('hold SHIFT to sprint', canvas.width/2, canvas.height/2 + 60);
       }
       ctx.textAlign = 'left';
     }
