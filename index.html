@@ -33,31 +33,44 @@
       letter-spacing: 0.1em;
     }
     #scoreboard span { color: var(--accent, #4ade80); font-weight: bold; }
+    #settings-panel {
+      width: 400px;
+      background: #12122a;
+      border: 1px solid #2a2a4a;
+      border-radius: 6px;
+      padding: 8px 12px 10px;
+      margin-bottom: 8px;
+    }
+    #settings-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      color: #555;
+      text-transform: uppercase;
+      margin-bottom: 7px;
+    }
     #meta {
       display: flex;
-      gap: 10px;
+      gap: 6px;
       align-items: center;
-      margin-bottom: 8px;
       font-size: 0.7rem;
       letter-spacing: 0.06em;
       color: #888;
       flex-wrap: wrap;
-      justify-content: center;
     }
     .meta-btn {
-      background: none;
-      border: 1px solid #444;
-      color: #aaa;
+      background: #1a1a3a;
+      border: 1px solid #3a3a5a;
+      color: #bbb;
       font-family: 'Courier New', monospace;
-      font-size: 0.68rem;
-      padding: 2px 8px;
-      border-radius: 4px;
+      font-size: 0.72rem;
+      padding: 5px 11px;
+      border-radius: 5px;
       cursor: pointer;
       letter-spacing: 0.05em;
-      transition: border-color 0.2s, color 0.2s;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
     }
-    .meta-btn:hover { border-color: var(--accent, #4ade80); color: var(--accent, #4ade80); }
-    #difficulty-label { color: #facc15; font-weight: bold; letter-spacing: 0.1em; }
+    .meta-btn:hover { border-color: var(--accent, #4ade80); color: var(--accent, #4ade80); background: #1e1e40; }
+    #difficulty-label { color: #facc15; font-weight: bold; letter-spacing: 0.1em; font-size: 0.72rem; }
     canvas {
       border: 2px solid var(--accent, #4ade80);
       border-radius: 4px;
@@ -140,16 +153,19 @@
     &nbsp;&nbsp;
     BEST: <span id="high-score">0</span>
   </div>
-  <div id="meta">
-    <span id="difficulty-label">MEDIUM</span>
-    <button class="meta-btn" id="walls-toggle">WALLS: ON</button>
-    <button class="meta-btn" id="maze-toggle">MAZE: OFF</button>
-    <button class="meta-btn" id="ai-toggle">AI: OFF</button>
-    <button class="meta-btn" id="portal-toggle">PORTALS: OFF</button>
-    <button class="meta-btn" id="timeattack-toggle">TIME: OFF</button>
-    <button class="meta-btn" id="dark-toggle">DARK: OFF</button>
-    <button class="meta-btn" id="theme-toggle">THEME: NEON</button>
-    <button class="meta-btn" id="mode-toggle">1 PLAYER</button>
+  <div id="settings-panel">
+    <div id="settings-label">⚙ Settings</div>
+    <div id="meta">
+      <span id="difficulty-label">MEDIUM</span>
+      <button class="meta-btn" id="walls-toggle">WALLS: ON</button>
+      <button class="meta-btn" id="maze-toggle">MAZE: OFF</button>
+      <button class="meta-btn" id="ai-toggle">AI: OFF</button>
+      <button class="meta-btn" id="portal-toggle">PORTALS: OFF</button>
+      <button class="meta-btn" id="timeattack-toggle">TIME: OFF</button>
+      <button class="meta-btn" id="dark-toggle">DARK: OFF</button>
+      <button class="meta-btn" id="theme-toggle">THEME: NEON</button>
+      <button class="meta-btn" id="mode-toggle">1 PLAYER</button>
+    </div>
   </div>
   <canvas id="game" width="400" height="400"></canvas>
   <div id="stamina-wrap">
@@ -381,8 +397,7 @@
       boostUses = 0; powerUpsCollected = 0; toastQueue = [];
       moveHistory = [];
       ghostIdx = 0;
-      // Load best ghost from localStorage
-      try { ghostFrames = JSON.parse(localStorage.getItem('snakeGhost') || '[]'); } catch { ghostFrames = []; }
+      // ghostFrames persists in memory across games (not localStorage — avoids quota issues)
       highScore = parseInt(localStorage.getItem('snakeHigh') || '0');
       scoreEl.textContent = score;
       highScoreEl.textContent = highScore;
@@ -823,9 +838,8 @@
 
     function endGame() {
       gameOver = true;
-      // Save ghost if this is the best run
+      // Keep best ghost in memory (not localStorage — avoids quota issues)
       if (!twoPlayer && moveHistory.length > ghostFrames.length) {
-        try { localStorage.setItem('snakeGhost', JSON.stringify(moveHistory)); } catch {}
         ghostFrames = moveHistory;
       }
       checkLeaderboard();
@@ -1329,6 +1343,8 @@
 
     applyTheme();
     updateDiffLabel();
+    // Pre-load high score before first init so it shows immediately
+    highScoreEl.textContent = localStorage.getItem('snakeHigh') || '0';
     init();
     requestAnimationFrame(idleDraw);
   </script>
