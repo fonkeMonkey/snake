@@ -108,7 +108,7 @@
     #btn-down  { bottom: 0; left: 42px; }
     #btn-left  { top: 42px; left: 0; }
     #btn-right { top: 42px; right: 0; }
-    #instructions { margin-top: 8px; font-size: 0.68rem; color: #777; letter-spacing: 0.05em; }
+    #instructions { margin-top: 8px; font-size: 0.68rem; color: #999; letter-spacing: 0.05em; }
     #stamina-wrap {
       width: 400px;
       margin-top: 7px;
@@ -150,7 +150,7 @@
       display: flex; gap: 6px; margin-top: 7px; align-items: center;
     }
     #color-picker::before {
-      content: 'COLOR'; font-size: 0.6rem; color: #555; letter-spacing: 0.06em; margin-right: 2px;
+      content: 'COLOR'; font-size: 0.6rem; color: #999; letter-spacing: 0.06em; margin-right: 2px;
     }
     .swatch {
       width: 16px; height: 16px; border-radius: 4px; cursor: pointer;
@@ -178,7 +178,7 @@
       <button class="meta-btn on" id="walls-toggle">WALLS: ON</button>
       <button class="meta-btn on" id="maze-toggle">MAZE: ON</button>
       <button class="meta-btn on" id="ai-toggle">AI: ON</button>
-      <button class="meta-btn on" id="portal-toggle">PORTALS: ON</button>
+      <button class="meta-btn" id="portal-toggle">PORTALS: OFF</button>
       <button class="meta-btn" id="timeattack-toggle">TIME: OFF</button>
       <button class="meta-btn" id="dark-toggle">DARK: OFF</button>
       <button class="meta-btn" id="theme-toggle">THEME: NEON</button>
@@ -246,7 +246,7 @@
     let twoPlayer = false;
     let mazeMode = true;
     let aiMode = true;
-    let portalsOn = true;
+    let portalsOn = false;
     let timeAttack = false;
     let darkMode = false;
 
@@ -898,6 +898,7 @@
 
     // ── Draw ──────────────────────────────────────────────────────
     function draw() {
+      if (!food) return; // not yet initialized
       const t = THEMES[themeIdx];
 
       // Screen shake
@@ -946,9 +947,9 @@
 
       // Obstacles
       obstacles.forEach(o => {
-        ctx.fillStyle = '#555';
+        ctx.fillStyle = '#6b7280';
         ctx.beginPath(); ctx.roundRect(o.x*CELL+1, o.y*CELL+1, CELL-2, CELL-2, 2); ctx.fill();
-        ctx.fillStyle = '#333';
+        ctx.fillStyle = '#4b5563';
         ctx.fillRect(o.x*CELL+4, o.y*CELL+4, CELL-8, CELL-8);
       });
 
@@ -983,9 +984,9 @@
         } else {
           ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
         }
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
-        ctx.font = 'bold 9px Courier New'; ctx.textAlign = 'center';
-        ctx.fillText(`+${ef.pts}`, cx, cy + 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = 'bold 10px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText(`+${ef.pts}`, cx, cy + 4);
         ctx.textAlign = 'left';
       });
 
@@ -1202,16 +1203,16 @@
       }
 
       // Difficulty
-      ctx.font = '11px Courier New'; ctx.fillStyle = '#666';
+      ctx.font = '11px Courier New'; ctx.fillStyle = '#aaa';
       ctx.fillText('DIFFICULTY', canvas.width/2, 304);
       DIFF_ORDER.forEach((d, i) => {
         const bx = 38 + i*110, by = 312, bw = 90, bh = 26;
         const active = difficulty === d;
         ctx.fillStyle = active ? THEMES[themeIdx].accent : '#1e1e3a';
-        ctx.strokeStyle = active ? THEMES[themeIdx].accent : '#444';
+        ctx.strokeStyle = active ? THEMES[themeIdx].accent : '#666';
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = active ? '#0f0f1a' : '#888';
+        ctx.fillStyle = active ? '#0f0f1a' : '#ccc';
         ctx.font = 'bold 11px Courier New';
         ctx.fillText(DIFFICULTIES[d].label, bx+bw/2, by+18);
       });
