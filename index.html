@@ -1681,7 +1681,7 @@
 
       const availW = window.innerWidth  - pad;
       const availH = window.innerHeight - aboveH - belowH - pad;
-      const size   = Math.min(availW, availH);
+      const size   = Math.min(availW, availH) * 0.75;
 
       CELL = Math.max(16, Math.min(44, Math.floor(size / COLS)));
       const px = CELL * COLS;
