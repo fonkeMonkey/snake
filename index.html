@@ -1690,6 +1690,10 @@
       canvas.height = px;
       settingsEl.style.width = px + 'px';
       staminaEl.style.width  = px + 'px';
+
+      // Scale all rem-based UI text proportionally with canvas size
+      const fs = Math.max(11, Math.min(22, px / 26));
+      document.documentElement.style.fontSize = fs + 'px';
     }
 
     let _resizeTimer;
