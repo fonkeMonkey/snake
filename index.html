@@ -263,6 +263,7 @@
     let milestone = null; // { text, alpha }
     let winner = null; // for 2p
     let stamina = STAMINA_MAX, shiftHeld = false;
+    let needsStart = true; // wait for first user gesture before playing audio
     let combo = 1, comboTimer = null, comboAlpha = 0;
     let toastQueue = [];
     let snakeAI, dirAI, nextDirAI;
@@ -345,14 +346,17 @@
       if (audioCtx.state === 'suspended') audioCtx.resume();
       return audioCtx;
     }
-    // Unlock audio on first interaction so countdown beep works on game 1
-    function unlockAudio() {
-      getAudio();
-      document.removeEventListener('keydown', unlockAudio);
-      document.removeEventListener('pointerdown', unlockAudio);
+    // On first interaction: unlock audio AND start the game
+    function onFirstGesture() {
+      if (!needsStart) return;
+      needsStart = false;
+      getAudio(); // creates + resumes AudioContext inside user gesture
+      startCountdown();
+      document.removeEventListener('keydown', onFirstGesture);
+      canvas.removeEventListener('pointerdown', onFirstGesture);
     }
-    document.addEventListener('keydown', unlockAudio);
-    document.addEventListener('pointerdown', unlockAudio);
+    document.addEventListener('keydown', onFirstGesture);
+    canvas.addEventListener('pointerdown', onFirstGesture);
 
     function playTone(freq1, freq2, dur, type = 'sine', vol = 0.15) {
       try {
@@ -428,7 +432,7 @@
       highScoreEl.textContent = highScore;
       spawnFood();
       if (intervalId) clearInterval(intervalId);
-      startCountdown();
+      if (needsStart) { draw(); } else { startCountdown(); }
     }
 
     function startCountdown() {
@@ -1139,6 +1143,19 @@
       ctx.textAlign = 'left';
     }
 
+    function drawStartScreen() {
+      ctx.fillStyle = 'rgba(0,0,0,0.72)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = THEMES[themeIdx].accent;
+      ctx.font = 'bold 48px Courier New';
+      ctx.fillText('SNAKE', canvas.width/2, canvas.height/2 - 18);
+      ctx.fillStyle = '#ccc';
+      ctx.font = '14px Courier New';
+      ctx.fillText('PRESS ANY KEY OR CLICK TO START', canvas.width/2, canvas.height/2 + 22);
+      ctx.textAlign = 'left';
+    }
+
     function drawPause() {
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1289,6 +1306,7 @@
     });
 
     document.addEventListener('keydown', e => {
+      if (needsStart) return; // waiting for first gesture (handled by onFirstGesture)
       if (e.key === 'Shift' && !shiftHeld && !gameOver && countdownVal === null && !paused) {
         shiftHeld = true;
         if (stamina > 0) {
@@ -1366,7 +1384,10 @@
 
     // Idle animation loop (food wobble, power-up pulse redraw)
     function idleDraw() {
-      if (!gameOver && !paused && countdownVal === null) draw();
+      if (!gameOver && !paused && countdownVal === null) {
+        draw();
+        if (needsStart) drawStartScreen();
+      }
       requestAnimationFrame(idleDraw);
     }
 
