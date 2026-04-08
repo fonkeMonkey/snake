@@ -49,7 +49,7 @@
     }
     #score.pop { animation: scorePop 0.22s ease-out; }
     #settings-panel {
-      width: 400px;
+      width: 500px;
       background: rgba(15,15,35,0.8);
       border: 1px solid #2a2a4a;
       border-radius: 8px;
@@ -126,7 +126,7 @@
     #btn-right { top: 42px; right: 0; }
     #instructions { margin-top: 8px; font-size: 0.68rem; color: #999; letter-spacing: 0.05em; }
     #stamina-wrap {
-      width: 400px;
+      width: 500px;
       margin-top: 7px;
     }
     #stamina-label {
@@ -201,7 +201,7 @@
       <button class="meta-btn" id="mode-toggle">1 PLAYER</button>
     </div>
   </div>
-  <canvas id="game" width="400" height="400"></canvas>
+  <canvas id="game" width="500" height="500"></canvas>
   <div id="stamina-wrap">
     <div id="stamina-label">SPRINT — <span style="color:#888">hold</span> <kbd id="shift-key">SHIFT</kbd> <span style="color:#555">to boost speed</span></div>
     <div id="stamina-track"><div id="stamina-fill"></div></div>
@@ -230,7 +230,7 @@
     const themeBtn     = document.getElementById('theme-toggle');
     const modeBtn      = document.getElementById('mode-toggle');
 
-    const COLS = 20, ROWS = 20, CELL = 20;
+    const COLS = 20, ROWS = 20, CELL = 25;
     const MIN_SPEED = 60;
     const STAMINA_MAX = 100;
 
