@@ -49,7 +49,6 @@
     }
     #score.pop { animation: scorePop 0.22s ease-out; }
     #settings-panel {
-      width: 500px;
       background: rgba(15,15,35,0.8);
       border: 1px solid #2a2a4a;
       border-radius: 8px;
@@ -126,7 +125,6 @@
     #btn-right { top: 42px; right: 0; }
     #instructions { margin-top: 8px; font-size: 0.68rem; color: #999; letter-spacing: 0.05em; }
     #stamina-wrap {
-      width: 500px;
       margin-top: 7px;
     }
     #stamina-label {
@@ -230,7 +228,8 @@
     const themeBtn     = document.getElementById('theme-toggle');
     const modeBtn      = document.getElementById('mode-toggle');
 
-    const COLS = 20, ROWS = 20, CELL = 25;
+    const COLS = 20, ROWS = 20;
+    let CELL = 25;
     const MIN_SPEED = 60;
     const STAMINA_MAX = 100;
 
@@ -1322,63 +1321,70 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.textAlign = 'center';
 
+      const ch = canvas.height, cw = canvas.width;
+      const s = ch / 500; // scale factor relative to reference 500px canvas
+
       if (twoPlayer && winner) {
         ctx.fillStyle = winner === 'P1' ? THEMES[themeIdx].accent : '#38bdf8';
-        ctx.font = 'bold 32px Courier New';
-        ctx.fillText(`${winner} WINS!`, canvas.width/2, 110);
+        ctx.font = `bold ${Math.round(32*s)}px Courier New`;
+        ctx.fillText(`${winner} WINS!`, cw/2, ch*0.22);
       } else {
         ctx.fillStyle = '#ef4444';
-        ctx.font = 'bold 36px Courier New';
-        ctx.fillText('GAME OVER', canvas.width/2, 110);
+        ctx.font = `bold ${Math.round(36*s)}px Courier New`;
+        ctx.fillText('GAME OVER', cw/2, ch*0.22);
       }
 
       ctx.fillStyle = '#eee';
-      ctx.font = '16px Courier New';
-      ctx.fillText(`Score: ${score}`, canvas.width/2, 148);
-      ctx.fillText(`Best:  ${highScore}`, canvas.width/2, 170);
+      ctx.font = `${Math.round(16*s)}px Courier New`;
+      ctx.fillText(`Score: ${score}`, cw/2, ch*0.296);
+      ctx.fillText(`Best:  ${highScore}`, cw/2, ch*0.34);
 
       // Leaderboard
       const board = getBoard();
       if (board.length) {
-        ctx.font = '11px Courier New';
+        ctx.font = `${Math.round(11*s)}px Courier New`;
         ctx.fillStyle = '#facc15';
-        ctx.fillText('TOP SCORES', canvas.width/2, 196);
+        ctx.fillText('TOP SCORES', cw/2, ch*0.392);
         ctx.fillStyle = '#aaa';
         board.forEach((e, i) => {
-          ctx.fillText(`${i+1}. ${e.initials}  ${e.score}`, canvas.width/2, 212 + i*16);
+          ctx.fillText(`${i+1}. ${e.initials}  ${e.score}`, cw/2, ch*0.424 + i*Math.round(16*s));
         });
       }
 
       // Difficulty
-      ctx.font = '11px Courier New'; ctx.fillStyle = '#aaa';
-      ctx.fillText('DIFFICULTY', canvas.width/2, 304);
+      const diffBtnW = Math.round(90*s), diffBtnH = Math.round(26*s);
+      const diffStartX = cw/2 - (3*diffBtnW + 2*Math.round(10*s))/2;
+      ctx.font = `${Math.round(11*s)}px Courier New`; ctx.fillStyle = '#aaa';
+      ctx.fillText('DIFFICULTY', cw/2, ch*0.608);
       DIFF_ORDER.forEach((d, i) => {
-        const bx = 38 + i*110, by = 312, bw = 90, bh = 26;
+        const bx = diffStartX + i*(diffBtnW + Math.round(10*s)), by = ch*0.624;
         const active = difficulty === d;
         ctx.fillStyle = active ? THEMES[themeIdx].accent : '#1e1e3a';
         ctx.strokeStyle = active ? THEMES[themeIdx].accent : '#666';
         ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(bx, by, diffBtnW, diffBtnH, 4); ctx.fill(); ctx.stroke();
         ctx.fillStyle = active ? '#0f0f1a' : '#ccc';
-        ctx.font = 'bold 11px Courier New';
-        ctx.fillText(DIFFICULTIES[d].label, bx+bw/2, by+18);
+        ctx.font = `bold ${Math.round(11*s)}px Courier New`;
+        ctx.fillText(DIFFICULTIES[d].label, bx+diffBtnW/2, by+diffBtnH*0.69);
       });
 
       // Play again
-      const bx = canvas.width/2 - 70, by = 356;
+      const btnW = Math.round(140*s), btnH = Math.round(34*s);
+      const bx = cw/2 - btnW/2, by = ch*0.712;
       ctx.fillStyle = THEMES[themeIdx].accent;
-      ctx.beginPath(); ctx.roundRect(bx, by, 140, 34, 6); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(bx, by, btnW, btnH, 6); ctx.fill();
       ctx.fillStyle = '#0f0f1a';
-      ctx.font = 'bold 15px Courier New';
-      ctx.fillText('PLAY AGAIN', canvas.width/2, by+23);
+      ctx.font = `bold ${Math.round(15*s)}px Courier New`;
+      ctx.fillText('PLAY AGAIN', cw/2, by+btnH*0.68);
 
       // Share / score card button
+      const sbW = Math.round(80*s), sbH = Math.round(22*s);
       ctx.fillStyle = '#1e1e3a';
       ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.roundRect(canvas.width/2 - 40, by+42, 80, 22, 4); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.roundRect(cw/2 - sbW/2, by+btnH+8, sbW, sbH, 4); ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#aaa';
-      ctx.font = '11px Courier New';
-      ctx.fillText('SHARE SCORE', canvas.width/2, by+57);
+      ctx.font = `${Math.round(11*s)}px Courier New`;
+      ctx.fillText('SHARE SCORE', cw/2, by+btnH+8+sbH*0.72);
 
       ctx.textAlign = 'left';
     }
@@ -1508,17 +1514,26 @@
       const rect = canvas.getBoundingClientRect();
       const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
       const my = (e.clientY - rect.top)  * (canvas.height / rect.height);
+      const ch = canvas.height, cw = canvas.width;
+      const s = ch / 500;
+
+      // Difficulty buttons
+      const diffBtnW = Math.round(90*s), diffBtnH = Math.round(26*s);
+      const diffStartX = cw/2 - (3*diffBtnW + 2*Math.round(10*s))/2;
       DIFF_ORDER.forEach((d, i) => {
-        const bx = 38 + i*110, by = 312, bw = 90, bh = 26;
-        if (mx >= bx && mx <= bx+bw && my >= by && my <= by+bh) {
+        const bx = diffStartX + i*(diffBtnW + Math.round(10*s)), by = ch*0.624;
+        if (mx >= bx && mx <= bx+diffBtnW && my >= by && my <= by+diffBtnH) {
           difficulty = d; updateDiffLabel(); drawOverlay();
         }
       });
-      const bx = canvas.width/2 - 70, by = 356;
-      if (mx >= bx && mx <= bx+140 && my >= by && my <= by+34) init();
+      // Play again
+      const btnW = Math.round(140*s), btnH = Math.round(34*s);
+      const bx = cw/2 - btnW/2, by = ch*0.712;
+      if (mx >= bx && mx <= bx+btnW && my >= by && my <= by+btnH) init();
       // Share button
-      const sbx = canvas.width/2 - 40, sby = by+42;
-      if (mx >= sbx && mx <= sbx+80 && my >= sby && my <= sby+22) downloadScoreCard();
+      const sbW = Math.round(80*s), sbH = Math.round(22*s);
+      const sbx = cw/2 - sbW/2, sby = by+btnH+8;
+      if (mx >= sbx && mx <= sbx+sbW && my >= sby && my <= sby+sbH) downloadScoreCard();
     });
 
     // D-pad
@@ -1539,10 +1554,47 @@
       requestAnimationFrame(idleDraw);
     }
 
+    function resizeCanvas() {
+      const h1El        = document.querySelector('h1');
+      const scoreEl2    = document.getElementById('scoreboard');
+      const settingsEl  = document.getElementById('settings-panel');
+      const staminaEl   = document.getElementById('stamina-wrap');
+
+      // Sum heights of elements above the canvas (includes their margins)
+      function outerH(el) {
+        if (!el) return 0;
+        const s = getComputedStyle(el);
+        return el.offsetHeight + parseFloat(s.marginTop) + parseFloat(s.marginBottom);
+      }
+      const aboveH = outerH(h1El) + outerH(scoreEl2) + outerH(settingsEl);
+      // Below canvas: stamina bar + color picker + instructions + padding
+      const belowH = 100;
+      const pad    = 32;
+
+      const availW = window.innerWidth  - pad;
+      const availH = window.innerHeight - aboveH - belowH - pad;
+      const size   = Math.min(availW, availH);
+
+      CELL = Math.max(16, Math.min(44, Math.floor(size / COLS)));
+      const px = CELL * COLS;
+
+      canvas.width  = px;
+      canvas.height = px;
+      settingsEl.style.width = px + 'px';
+      staminaEl.style.width  = px + 'px';
+    }
+
+    let _resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(() => { resizeCanvas(); if (gameOver) drawOverlay(); else draw(); }, 100);
+    });
+
     applyTheme();
     updateDiffLabel();
     // Pre-load high score before first init so it shows immediately
     highScoreEl.textContent = localStorage.getItem('snakeHigh') || '0';
+    resizeCanvas();
     init();
     requestAnimationFrame(idleDraw);
   </script>
