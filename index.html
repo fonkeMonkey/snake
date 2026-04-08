@@ -517,26 +517,88 @@
     }
 
     // ── AI Snake ──────────────────────────────────────────────────
+    const AI_DIRS = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+
+    function aiOccupied() {
+      const s = new Set();
+      // Exclude tail (it moves away each tick) to avoid false dead-ends
+      snakeAI.slice(0, -1).forEach(c => s.add(`${c.x},${c.y}`));
+      snake.slice(0, -1).forEach(c => s.add(`${c.x},${c.y}`));
+      obstacles.forEach(o => s.add(`${o.x},${o.y}`));
+      return s;
+    }
+
+    function aiWrap(nx, ny) {
+      if (wallsOn && (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS)) return null;
+      return { x: (nx + COLS) % COLS, y: (ny + ROWS) % ROWS };
+    }
+
+    // BFS: returns first direction toward target, or null if unreachable
+    function bfsToward(from, target, occ) {
+      const start = `${from.x},${from.y}`;
+      const goal  = `${target.x},${target.y}`;
+      if (start === goal) return null;
+      const queue = [{ x: from.x, y: from.y, first: null }];
+      const visited = new Set([start]);
+      while (queue.length) {
+        const cur = queue.shift();
+        for (const d of AI_DIRS) {
+          const nb = aiWrap(cur.x + d.x, cur.y + d.y);
+          if (!nb) continue;
+          const key = `${nb.x},${nb.y}`;
+          if (visited.has(key) || occ.has(key)) continue;
+          const firstDir = cur.first || d;
+          if (key === goal) return firstDir;
+          visited.add(key);
+          queue.push({ x: nb.x, y: nb.y, first: firstDir });
+        }
+      }
+      return null;
+    }
+
+    // Flood-fill: count reachable cells from (sx,sy) — used for survival
+    function floodFill(sx, sy, occ) {
+      const visited = new Set();
+      const queue = [{ x: sx, y: sy }];
+      visited.add(`${sx},${sy}`);
+      while (queue.length) {
+        const cur = queue.shift();
+        for (const d of AI_DIRS) {
+          const nb = aiWrap(cur.x + d.x, cur.y + d.y);
+          if (!nb) continue;
+          const key = `${nb.x},${nb.y}`;
+          if (!visited.has(key) && !occ.has(key)) {
+            visited.add(key);
+            queue.push(nb);
+          }
+        }
+      }
+      return visited.size;
+    }
+
     function aiStep() {
       if (!snakeAI || snakeAI.length === 0) return;
       const head = snakeAI[0];
-      const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
-      const valid = dirs.filter(d => !(d.x === -dirAI.x && d.y === -dirAI.y));
-      function isSafe(nx, ny) {
-        if (wallsOn && (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS)) return false;
-        nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS;
-        if (snakeAI.some(s => s.x === nx && s.y === ny)) return false;
-        if (snake.some(s => s.x === nx && s.y === ny)) return false;
-        if (obstacles.some(o => o.x === nx && o.y === ny)) return false;
-        return true;
+      const occ  = aiOccupied();
+
+      // 1. Try BFS toward food
+      let chosen = bfsToward(head, food, occ);
+
+      // 2. Fallback: pick the open direction with the most reachable space
+      if (!chosen) {
+        const candidates = AI_DIRS
+          .filter(d => !(d.x === -dirAI.x && d.y === -dirAI.y))
+          .map(d => {
+            const nb = aiWrap(head.x + d.x, head.y + d.y);
+            if (!nb || occ.has(`${nb.x},${nb.y}`)) return { d, space: -1 };
+            return { d, space: floodFill(nb.x, nb.y, occ) };
+          })
+          .filter(c => c.space >= 0)
+          .sort((a, b) => b.space - a.space);
+        chosen = candidates.length ? candidates[0].d : dirAI;
       }
-      function dist(nx, ny) {
-        return Math.abs(nx - food.x) + Math.abs(ny - food.y);
-      }
-      const safe = valid.filter(d => isSafe(head.x + d.x, head.y + d.y));
-      if (safe.length === 0) { nextDirAI = dirAI; return; }
-      safe.sort((a, b) => dist(head.x+a.x, head.y+a.y) - dist(head.x+b.x, head.y+b.y));
-      nextDirAI = safe[0];
+
+      nextDirAI = chosen;
     }
     function tickAI() {
       if (!snakeAI) return;
