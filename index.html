@@ -70,6 +70,12 @@
       transition: border-color 0.2s, color 0.2s, background 0.2s;
     }
     .meta-btn:hover { border-color: var(--accent, #4ade80); color: var(--accent, #4ade80); background: #1e1e40; }
+    .meta-btn.on {
+      border-color: var(--accent, #4ade80);
+      color: var(--accent, #4ade80);
+      background: rgba(74,222,128,0.08);
+    }
+    .meta-btn.on:hover { background: rgba(74,222,128,0.15); }
     #difficulty-label { color: #facc15; font-weight: bold; letter-spacing: 0.1em; font-size: 0.72rem; }
     canvas {
       border: 2px solid var(--accent, #4ade80);
@@ -169,10 +175,10 @@
     <div id="settings-label">⚙ Settings</div>
     <div id="meta">
       <span id="difficulty-label">MEDIUM</span>
-      <button class="meta-btn" id="walls-toggle">WALLS: ON</button>
-      <button class="meta-btn" id="maze-toggle">MAZE: ON</button>
-      <button class="meta-btn" id="ai-toggle">AI: OFF</button>
-      <button class="meta-btn" id="portal-toggle">PORTALS: ON</button>
+      <button class="meta-btn on" id="walls-toggle">WALLS: ON</button>
+      <button class="meta-btn on" id="maze-toggle">MAZE: ON</button>
+      <button class="meta-btn on" id="ai-toggle">AI: ON</button>
+      <button class="meta-btn on" id="portal-toggle">PORTALS: ON</button>
       <button class="meta-btn" id="timeattack-toggle">TIME: OFF</button>
       <button class="meta-btn" id="dark-toggle">DARK: OFF</button>
       <button class="meta-btn" id="theme-toggle">THEME: NEON</button>
@@ -239,7 +245,7 @@
     let wallsOn = true;
     let twoPlayer = false;
     let mazeMode = true;
-    let aiMode = false;
+    let aiMode = true;
     let portalsOn = true;
     let timeAttack = false;
     let darkMode = false;
@@ -257,7 +263,6 @@
     let milestone = null; // { text, alpha }
     let winner = null; // for 2p
     let stamina = STAMINA_MAX, shiftHeld = false;
-    let moveHistory = [], ghostFrames = [], ghostIdx = 0;
     let combo = 1, comboTimer = null, comboAlpha = 0;
     let toastQueue = [];
     let snakeAI, dirAI, nextDirAI;
@@ -418,9 +423,6 @@
       combo = 1; comboAlpha = 0;
       if (comboTimer) { clearTimeout(comboTimer); comboTimer = null; }
       boostUses = 0; powerUpsCollected = 0; toastQueue = [];
-      moveHistory = [];
-      ghostIdx = 0;
-      // ghostFrames persists in memory across games (not localStorage — avoids quota issues)
       highScore = parseInt(localStorage.getItem('snakeHigh') || '0');
       scoreEl.textContent = score;
       highScoreEl.textContent = highScore;
@@ -726,9 +728,6 @@
       dir  = nextDir;
       if (twoPlayer) dir2 = nextDir2;
 
-      // Record snake state for ghost replay
-      if (!twoPlayer) moveHistory.push(snake.map(s => ({ ...s })));
-
       const r1 = moveSnake(snake, dir, true);
       if (r1 === 'dead') { winner = twoPlayer ? 'P2' : null; triggerDeath(); return; }
       if (r1 === 'bounce') { /* skip grow */ } else {
@@ -776,7 +775,6 @@
       toastQueue.forEach(t => t.alpha = Math.max(0, t.alpha - 0.008));
       toastQueue = toastQueue.filter(t => t.alpha > 0);
       if (flashFrames > 0) flashFrames--;
-      if (!twoPlayer && ghostFrames.length) ghostIdx = Math.min(ghostIdx + 1, ghostFrames.length - 1);
       draw();
     }
 
@@ -872,10 +870,6 @@
 
     function endGame() {
       gameOver = true;
-      // Keep best ghost in memory (not localStorage — avoids quota issues)
-      if (!twoPlayer && moveHistory.length > ghostFrames.length) {
-        ghostFrames = moveHistory;
-      }
       checkLeaderboard();
       draw();
       drawOverlay();
@@ -1008,18 +1002,6 @@
         ctx.fillText(puIcon[powerUp.type] || '?',
           powerUp.x*CELL+CELL/2, powerUp.y*CELL+CELL/2+4);
         ctx.textAlign = 'left';
-      }
-
-      // Ghost snake (best run replay)
-      if (!twoPlayer && ghostFrames.length > ghostIdx) {
-        const gFrame = ghostFrames[ghostIdx];
-        ctx.globalAlpha = 0.18;
-        gFrame.forEach((seg, i) => {
-          ctx.fillStyle = i === 0 ? '#fff' : '#aaa';
-          const pad = i === 0 ? 1 : 2;
-          ctx.beginPath(); ctx.roundRect(seg.x*CELL+pad, seg.y*CELL+pad, CELL-pad*2, CELL-pad*2, i===0?4:3); ctx.fill();
-        });
-        ctx.globalAlpha = 1;
       }
 
       // Snakes
@@ -1243,38 +1225,46 @@
       diffLabel.style.color = cols[difficulty];
     }
 
+    function setBtn(btn, state) { btn.classList.toggle('on', state); }
+
     wallsBtn.addEventListener('click', () => {
       wallsOn = !wallsOn;
       wallsBtn.textContent = `WALLS: ${wallsOn ? 'ON' : 'OFF'}`;
+      setBtn(wallsBtn, wallsOn);
     });
 
     mazeBtn.addEventListener('click', () => {
       mazeMode = !mazeMode;
       mazeBtn.textContent = `MAZE: ${mazeMode ? 'ON' : 'OFF'}`;
+      setBtn(mazeBtn, mazeMode);
       init();
     });
 
     aiBtn.addEventListener('click', () => {
       aiMode = !aiMode;
       aiBtn.textContent = `AI: ${aiMode ? 'ON' : 'OFF'}`;
+      setBtn(aiBtn, aiMode);
       init();
     });
 
     portalBtn.addEventListener('click', () => {
       portalsOn = !portalsOn;
       portalBtn.textContent = `PORTALS: ${portalsOn ? 'ON' : 'OFF'}`;
+      setBtn(portalBtn, portalsOn);
       init();
     });
 
     timeBtn.addEventListener('click', () => {
       timeAttack = !timeAttack;
       timeBtn.textContent = `TIME: ${timeAttack ? 'ON' : 'OFF'}`;
+      setBtn(timeBtn, timeAttack);
       init();
     });
 
     darkBtn.addEventListener('click', () => {
       darkMode = !darkMode;
       darkBtn.textContent = `DARK: ${darkMode ? 'ON' : 'OFF'}`;
+      setBtn(darkBtn, darkMode);
     });
 
     themeBtn.addEventListener('click', () => {
