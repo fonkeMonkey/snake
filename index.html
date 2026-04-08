@@ -23,6 +23,14 @@
       margin-bottom: 12px;
       text-transform: uppercase;
     }
+    #scoreboard {
+      display: flex;
+      gap: 40px;
+      margin-bottom: 10px;
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+    }
+    #scoreboard span { color: #4ade80; font-weight: bold; }
     canvas {
       border: 2px solid #4ade80;
       border-radius: 4px;
@@ -32,16 +40,23 @@
 </head>
 <body>
   <h1>Snake</h1>
+  <div id="scoreboard">
+    SCORE: <span id="score">0</span>
+    &nbsp;&nbsp;&nbsp;
+    BEST: <span id="high-score">0</span>
+  </div>
   <canvas id="game" width="400" height="400"></canvas>
 
   <script>
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const highScoreEl = document.getElementById('high-score');
 
     const COLS = 20, ROWS = 20, CELL = 20;
-    const BASE_SPEED = 150;
+    const BASE_SPEED = 150, MIN_SPEED = 60;
 
-    let snake, dir, nextDir, food, gameOver, intervalId;
+    let snake, dir, nextDir, food, score, highScore, foodCount, gameOver, intervalId;
 
     function init() {
       snake = [
@@ -51,7 +66,12 @@
       ];
       dir = { x: 1, y: 0 };
       nextDir = { x: 1, y: 0 };
+      score = 0;
+      foodCount = 0;
       gameOver = false;
+      highScore = parseInt(localStorage.getItem('snakeHigh') || '0');
+      scoreEl.textContent = score;
+      highScoreEl.textContent = highScore;
       spawnFood();
       if (intervalId) clearInterval(intervalId);
       intervalId = setInterval(tick, BASE_SPEED);
@@ -75,7 +95,20 @@
 
       snake.unshift(head);
       if (head.x === food.x && head.y === food.y) {
+        score += 10;
+        foodCount++;
+        scoreEl.textContent = score;
+        if (score > highScore) {
+          highScore = score;
+          localStorage.setItem('snakeHigh', highScore);
+          highScoreEl.textContent = highScore;
+        }
         spawnFood();
+        if (foodCount % 5 === 0) {
+          clearInterval(intervalId);
+          const newSpeed = Math.max(MIN_SPEED, BASE_SPEED - Math.floor(foodCount / 5) * 10);
+          intervalId = setInterval(tick, newSpeed);
+        }
       } else {
         snake.pop();
       }
