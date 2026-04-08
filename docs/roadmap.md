@@ -30,3 +30,27 @@
 - Overlay showing "Game Over", final score, and high score
 - Press Enter/Space or click Restart button to reset game state
 - Smooth restart without page reload
+
+## Feature 7: Levels / Difficulty Select
+- Easy / Medium / Hard options on a start screen before the game begins
+- Each difficulty sets a different starting speed and speed increment
+- Display current difficulty during play
+
+## Feature 8: Animations
+- Brief flash/pulse effect on the canvas when food is eaten
+- Death animation: flash the snake red before showing game over overlay
+
+## Feature 9: Sound Effects
+- Eat sound: short rising beep using Web Audio API
+- Death sound: descending buzz
+- No external assets — all synthesized via oscillators
+
+## Feature 10: Mobile Controls
+- On-screen D-pad rendered below the canvas
+- Touch events mapped to direction changes
+- Responsive layout that fits small screens
+
+## Feature 11: Walls Mode Toggle
+- Toggle button to switch between "walls kill" and "wrap around" modes
+- In wrap mode, snake exits one edge and enters the opposite
+- Toggle persists across restarts, visible in the UI
