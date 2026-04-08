@@ -131,3 +131,38 @@
 - Screen shakes briefly on death
 - Snake head squashes/stretches in direction of travel
 - Food wobbles in place with a subtle idle animation
+
+## Feature 28: AI Opponent
+- An orange AI snake shares the board and competes for food
+- AI uses simple pathfinding (greedy nearest food, avoids walls/self/player)
+- Toggle-able via a button; last alive wins in AI mode
+
+## Feature 29: Portal Tiles
+- Two colored portal pairs spawn on the grid
+- Snake entering one portal instantly exits the other
+- Portals pulse with a glow animation
+
+## Feature 30: Time Attack Mode
+- 60-second countdown timer shown on canvas
+- Score as many points as possible before time runs out
+- Final score shown with "TIME'S UP!" on game over overlay
+
+## Feature 31: Multi-Food
+- Three food items on screen simultaneously
+- Standard red (10pts), golden star (25pts), blinking cyan (50pts, appears briefly)
+- Replaced individually as each is eaten
+
+## Feature 32: Snake Color Picker
+- Small color swatch palette below the canvas (8 colors)
+- Clicking a swatch changes the player snake's color live
+- Selection persists in localStorage
+
+## Feature 33: Score Card
+- "SHARE" button appears on game over screen
+- Renders a stylized score card to an offscreen canvas
+- Triggers a PNG download of the card
+
+## Feature 34: Darkness Mode
+- Toggle-able mode: canvas is black except for a lit radius around the snake head
+- Radius reveals food, power-ups, and nearby obstacles
+- Creates a flashlight / fog-of-war effect

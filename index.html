@@ -115,6 +115,18 @@
       border-radius: 3px;
       transition: background 0.2s;
     }
+    #color-picker {
+      display: flex; gap: 6px; margin-top: 7px; align-items: center;
+    }
+    #color-picker::before {
+      content: 'COLOR'; font-size: 0.6rem; color: #555; letter-spacing: 0.06em; margin-right: 2px;
+    }
+    .swatch {
+      width: 16px; height: 16px; border-radius: 4px; cursor: pointer;
+      border: 2px solid transparent; transition: border-color 0.15s, transform 0.1s;
+    }
+    .swatch:hover { transform: scale(1.2); }
+    .swatch.active { border-color: #fff; }
     @media (hover: none) and (pointer: coarse) {
       #dpad { display: block; }
       #instructions { display: none; }
@@ -132,6 +144,10 @@
     <span id="difficulty-label">MEDIUM</span>
     <button class="meta-btn" id="walls-toggle">WALLS: ON</button>
     <button class="meta-btn" id="maze-toggle">MAZE: OFF</button>
+    <button class="meta-btn" id="ai-toggle">AI: OFF</button>
+    <button class="meta-btn" id="portal-toggle">PORTALS: OFF</button>
+    <button class="meta-btn" id="timeattack-toggle">TIME: OFF</button>
+    <button class="meta-btn" id="dark-toggle">DARK: OFF</button>
     <button class="meta-btn" id="theme-toggle">THEME: NEON</button>
     <button class="meta-btn" id="mode-toggle">1 PLAYER</button>
   </div>
@@ -140,6 +156,7 @@
     <div id="stamina-label">BOOST [SHIFT]</div>
     <div id="stamina-track"><div id="stamina-fill"></div></div>
   </div>
+  <div id="color-picker"></div>
   <div id="dpad">
     <button id="btn-up">▲</button>
     <button id="btn-left">◀</button>
@@ -156,6 +173,10 @@
     const diffLabel    = document.getElementById('difficulty-label');
     const wallsBtn     = document.getElementById('walls-toggle');
     const mazeBtn      = document.getElementById('maze-toggle');
+    const aiBtn        = document.getElementById('ai-toggle');
+    const portalBtn    = document.getElementById('portal-toggle');
+    const timeBtn      = document.getElementById('timeattack-toggle');
+    const darkBtn      = document.getElementById('dark-toggle');
     const themeBtn     = document.getElementById('theme-toggle');
     const modeBtn      = document.getElementById('mode-toggle');
 
@@ -190,6 +211,10 @@
     let wallsOn = true;
     let twoPlayer = false;
     let mazeMode = false;
+    let aiMode = false;
+    let portalsOn = false;
+    let timeAttack = false;
+    let darkMode = false;
 
     // ── State ─────────────────────────────────────────────────────
     let snake, dir, nextDir;
@@ -207,6 +232,12 @@
     let moveHistory = [], ghostFrames = [], ghostIdx = 0;
     let combo = 1, comboTimer = null, comboAlpha = 0;
     let toastQueue = [];
+    let snakeAI, dirAI, nextDirAI;
+    let portals = [];
+    let timeLeft = 60, timeInterval = null;
+    let extraFoods = [];
+    let customSnakeRgb = localStorage.getItem('snakeColor') || '34,197,94';
+    let customHead = localStorage.getItem('snakeHead') || '#86efac';
 
     const ACHIEVEMENTS = [
       { id:'first_blood',  label:'First Blood',   desc:'Eat your first food',          icon:'🍎' },
@@ -244,6 +275,34 @@
       if (powerUpsCollected >= 5)  unlockAchievement('power_junkie');
       if (mazeMode && score >= 50) unlockAchievement('maze_runner');
     }
+
+    // ── Color picker setup ────────────────────────────────────────
+    const SNAKE_COLORS = [
+      { rgb:'34,197,94',   head:'#86efac', hex:'#22c55e' },
+      { rgb:'56,189,248',  head:'#bae6fd', hex:'#38bdf8' },
+      { rgb:'249,115,22',  head:'#fbbf24', hex:'#f97316' },
+      { rgb:'239,68,68',   head:'#fca5a5', hex:'#ef4444' },
+      { rgb:'168,85,247',  head:'#d8b4fe', hex:'#a855f7' },
+      { rgb:'236,72,153',  head:'#f9a8d4', hex:'#ec4899' },
+      { rgb:'234,179,8',   head:'#fde68a', hex:'#eab308' },
+      { rgb:'20,184,166',  head:'#99f6e4', hex:'#14b8a6' },
+    ];
+    (function buildPicker() {
+      const picker = document.getElementById('color-picker');
+      SNAKE_COLORS.forEach((c, i) => {
+        const sw = document.createElement('div');
+        sw.className = 'swatch' + (c.rgb === customSnakeRgb ? ' active' : '');
+        sw.style.background = c.hex;
+        sw.addEventListener('click', () => {
+          customSnakeRgb = c.rgb; customHead = c.head;
+          localStorage.setItem('snakeColor', c.rgb);
+          localStorage.setItem('snakeHead', c.head);
+          document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+          sw.classList.add('active');
+        });
+        picker.appendChild(sw);
+      });
+    })();
 
     // ── Audio ─────────────────────────────────────────────────────
     let audioCtx;
@@ -307,6 +366,14 @@
       particles = []; powerUp = null; obstacles = [];
       milestone = null; winner = null;
       if (mazeMode) generateMaze();
+      // AI
+      if (aiMode) respawnAI(); else snakeAI = null;
+      // Portals
+      portals = [];
+      // Extra foods
+      extraFoods = [];
+      // Time attack
+      if (timeInterval) { clearInterval(timeInterval); timeInterval = null; }
       stamina = STAMINA_MAX; shiftHeld = false;
       updateStaminaBar();
       combo = 1; comboAlpha = 0;
@@ -335,6 +402,9 @@
         if (countdownVal <= 0) {
           clearInterval(cd);
           countdownVal = null;
+          if (portalsOn) spawnPortals();
+          if (timeAttack) startTimeAttack();
+          spawnExtraFoods();
           restartInterval();
         }
       }, 800);
@@ -344,7 +414,10 @@
     function occupiedSet() {
       const s = new Set(snake.map(s => `${s.x},${s.y}`));
       if (twoPlayer) snake2.forEach(s2 => s.add(`${s2.x},${s2.y}`));
+      if (snakeAI) snakeAI.forEach(s2 => s.add(`${s2.x},${s2.y}`));
       obstacles.forEach(o => s.add(`${o.x},${o.y}`));
+      portals.forEach(p => s.add(`${p.x},${p.y}`));
+      extraFoods.forEach(f => s.add(`${f.x},${f.y}`));
       return s;
     }
 
@@ -399,6 +472,134 @@
       }
     }
 
+    // ── AI Snake ──────────────────────────────────────────────────
+    function aiStep() {
+      if (!snakeAI || snakeAI.length === 0) return;
+      const head = snakeAI[0];
+      const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+      const valid = dirs.filter(d => !(d.x === -dirAI.x && d.y === -dirAI.y));
+      function isSafe(nx, ny) {
+        if (wallsOn && (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS)) return false;
+        nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS;
+        if (snakeAI.some(s => s.x === nx && s.y === ny)) return false;
+        if (snake.some(s => s.x === nx && s.y === ny)) return false;
+        if (obstacles.some(o => o.x === nx && o.y === ny)) return false;
+        return true;
+      }
+      function dist(nx, ny) {
+        return Math.abs(nx - food.x) + Math.abs(ny - food.y);
+      }
+      const safe = valid.filter(d => isSafe(head.x + d.x, head.y + d.y));
+      if (safe.length === 0) { nextDirAI = dirAI; return; }
+      safe.sort((a, b) => dist(head.x+a.x, head.y+a.y) - dist(head.x+b.x, head.y+b.y));
+      nextDirAI = safe[0];
+    }
+    function tickAI() {
+      if (!snakeAI) return;
+      aiStep();
+      dirAI = nextDirAI;
+      let nx = snakeAI[0].x + dirAI.x, ny = snakeAI[0].y + dirAI.y;
+      if (wallsOn) {
+        if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) { respawnAI(); return; }
+      } else {
+        nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS;
+      }
+      if (snakeAI.some(s => s.x === nx && s.y === ny) ||
+          snake.some(s => s.x === nx && s.y === ny) ||
+          obstacles.some(o => o.x === nx && o.y === ny)) { respawnAI(); return; }
+      const aiHead = {x: nx, y: ny};
+      snakeAI.unshift(aiHead);
+      if (aiHead.x === food.x && aiHead.y === food.y) {
+        spawnFood(); playEat(); flashFrames = 2;
+        spawnParticles(aiHead.x, aiHead.y, '#f97316');
+      } else {
+        snakeAI.pop();
+      }
+    }
+    function respawnAI() {
+      snakeAI = [{x:10,y:16},{x:9,y:16},{x:8,y:16}];
+      dirAI = {x:1,y:0}; nextDirAI = {x:1,y:0};
+    }
+
+    // ── Portals ───────────────────────────────────────────────────
+    const PORTAL_COLORS = ['#a78bfa','#fb923c'];
+    function spawnPortals() {
+      portals = [];
+      for (let p = 0; p < 2; p++) {
+        for (let side = 0; side < 2; side++) {
+          const pos = randomEmpty();
+          portals.push({ ...pos, pair: p, side, color: PORTAL_COLORS[p] });
+        }
+      }
+    }
+    function checkPortal(nx, ny, snk) {
+      const portal = portals.find(p => p.x === nx && p.y === ny);
+      if (!portal) return null;
+      const exit = portals.find(p => p.pair === portal.pair && p.side !== portal.side);
+      if (!exit) return null;
+      // Place exiting 1 step beyond exit portal in current direction
+      return { x: exit.x, y: exit.y };
+    }
+
+    // ── Time Attack ───────────────────────────────────────────────
+    function startTimeAttack() {
+      timeLeft = 60;
+      if (timeInterval) clearInterval(timeInterval);
+      timeInterval = setInterval(() => {
+        if (paused || gameOver || countdownVal !== null) return;
+        timeLeft--;
+        if (timeLeft <= 0) {
+          clearInterval(timeInterval); timeInterval = null;
+          winner = null;
+          triggerDeath();
+        }
+      }, 1000);
+    }
+
+    // ── Extra Foods ───────────────────────────────────────────────
+    const EXTRA_FOOD_TYPES = [
+      { type:'golden', color:'#facc15', pts:25, ttl: null },
+      { type:'cyan',   color:'#22d3ee', pts:50, ttl: 40  },
+    ];
+    function spawnExtraFoods() {
+      extraFoods = [];
+      EXTRA_FOOD_TYPES.forEach(ft => {
+        extraFoods.push({ ...randomEmpty(), ...ft });
+      });
+    }
+
+    // ── Score Card ────────────────────────────────────────────────
+    function downloadScoreCard() {
+      const oc = document.createElement('canvas');
+      oc.width = 320; oc.height = 180;
+      const ox = oc.getContext('2d');
+      ox.fillStyle = '#0f0f1a';
+      ox.fillRect(0, 0, oc.width, oc.height);
+      ox.strokeStyle = THEMES[themeIdx].accent;
+      ox.lineWidth = 3;
+      ox.strokeRect(4, 4, oc.width-8, oc.height-8);
+      ox.textAlign = 'center';
+      ox.fillStyle = THEMES[themeIdx].accent;
+      ox.font = 'bold 28px Courier New';
+      ox.fillText('SNAKE', oc.width/2, 44);
+      ox.fillStyle = '#eee';
+      ox.font = 'bold 20px Courier New';
+      ox.fillText(`SCORE: ${score}`, oc.width/2, 82);
+      ox.fillStyle = '#888';
+      ox.font = '13px Courier New';
+      ox.fillText(`BEST: ${highScore}`, oc.width/2, 106);
+      ox.fillText(`DIFFICULTY: ${DIFFICULTIES[difficulty].label}`, oc.width/2, 126);
+      if (mazeMode) ox.fillText('MAZE MODE', oc.width/2, 144);
+      if (timeAttack) ox.fillText('TIME ATTACK', oc.width/2, 144);
+      ox.fillStyle = '#444';
+      ox.font = '10px Courier New';
+      ox.fillText('fonkemonkey.github.io/snake', oc.width/2, 166);
+      const link = document.createElement('a');
+      link.download = `snake-score-${score}.png`;
+      link.href = oc.toDataURL();
+      link.click();
+    }
+
     // ── Particle burst ────────────────────────────────────────────
     function spawnParticles(x, y, color) {
       for (let i = 0; i < 10; i++) {
@@ -444,6 +645,10 @@
       } else {
         nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS;
       }
+      // Portal teleport
+      const teleport = checkPortal(nx, ny, snk);
+      if (teleport) { nx = teleport.x; ny = teleport.y; }
+
       const head = { x: nx, y: ny };
       if (snk.some(s => s.x === nx && s.y === ny)) {
         if (shld) { if (isP1) shielded = false; else shield2 = false; return 'bounce'; }
@@ -490,6 +695,18 @@
       if (powerUp) {
         powerUp.ttl--;
         if (powerUp.ttl <= 0) powerUp = null;
+      }
+
+      // AI tick
+      if (aiMode && snakeAI) tickAI();
+
+      // Extra foods TTL
+      extraFoods.forEach(f => { if (f.ttl !== null) f.ttl--; });
+      extraFoods = extraFoods.filter(f => f.ttl === null || f.ttl > 0);
+      // Respawn missing extra foods
+      while (extraFoods.length < EXTRA_FOOD_TYPES.length) {
+        const ft = EXTRA_FOOD_TYPES[extraFoods.length];
+        try { extraFoods.push({ ...randomEmpty(), ...ft }); } catch { break; }
       }
 
       // Stamina: drain while boosting, recharge otherwise
@@ -542,6 +759,18 @@
         if (foodCount % 5 === 0) restartInterval();
       } else {
         snk.pop();
+      }
+      // extra foods
+      const eidx = extraFoods.findIndex(f => f.x === head.x && f.y === head.y);
+      if (eidx !== -1) {
+        const ef = extraFoods[eidx];
+        score += ef.pts * combo;
+        checkMilestone(score); checkAchievements();
+        scoreEl.textContent = score;
+        if (score > highScore) { highScore = score; localStorage.setItem('snakeHigh', highScore); highScoreEl.textContent = highScore; }
+        spawnParticles(head.x, head.y, ef.color);
+        playEat();
+        extraFoods.splice(eidx, 1);
       }
       // power-up
       if (powerUp && head.x === powerUp.x && head.y === powerUp.y) {
@@ -653,6 +882,22 @@
         ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(canvas.width,y*CELL); ctx.stroke();
       }
 
+      // Portals
+      portals.forEach(p => {
+        const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300 + p.pair * Math.PI);
+        ctx.globalAlpha = 0.5 + pulse * 0.5;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x*CELL+CELL/2, p.y*CELL+CELL/2, CELL/2-1, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(p.x*CELL+CELL/2, p.y*CELL+CELL/2, CELL/2-2, 0, Math.PI*2);
+        ctx.stroke();
+      });
+
       // Obstacles
       obstacles.forEach(o => {
         ctx.fillStyle = '#555';
@@ -671,6 +916,32 @@
       ctx.beginPath();
       ctx.arc(food.x*CELL+CELL/2-3, food.y*CELL+CELL/2-3, 3, 0, Math.PI*2);
       ctx.fill();
+
+      // Extra foods
+      extraFoods.forEach(ef => {
+        const blink = ef.ttl !== null ? (Math.floor(Date.now() / 150) % 2 === 0) : true;
+        if (!blink) return;
+        ctx.fillStyle = ef.color;
+        ctx.beginPath();
+        const cx = ef.x*CELL+CELL/2, cy = ef.y*CELL+CELL/2, r = CELL/2-2;
+        if (ef.type === 'golden') {
+          // Draw star
+          for (let j = 0; j < 5; j++) {
+            const a = j * Math.PI*2/5 - Math.PI/2;
+            const a2 = a + Math.PI/5;
+            j === 0 ? ctx.moveTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r)
+                    : ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+            ctx.lineTo(cx+Math.cos(a2)*r*0.45, cy+Math.sin(a2)*r*0.45);
+          }
+          ctx.closePath(); ctx.fill();
+        } else {
+          ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = 'bold 9px Courier New'; ctx.textAlign = 'center';
+        ctx.fillText(`+${ef.pts}`, cx, cy + 3);
+        ctx.textAlign = 'left';
+      });
 
       // Power-up
       if (powerUp) {
@@ -705,8 +976,9 @@
 
       // Snakes
       const dying = deathFrames > 0;
-      drawSnakeBody(snake, dir, t, dying, shielded, t.accent);
+      drawSnakeBody(snake, dir, t, dying, shielded, t.accent, true);
       if (twoPlayer) drawSnakeBody(snake2, dir2, t, dying && winner === 'P1', shield2, '#38bdf8');
+      if (aiMode && snakeAI) drawSnakeBody(snakeAI, dirAI, t, false, false, '#f97316');
 
       // Particles
       particles.forEach(p => {
@@ -725,6 +997,14 @@
         ctx.fillText(milestone.text, canvas.width/2, canvas.height/2 - 20);
         ctx.globalAlpha = 1;
         ctx.textAlign = 'left';
+      }
+
+      // Time attack timer
+      if (timeAttack && !gameOver && countdownVal === null) {
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 13px Courier New';
+        ctx.fillStyle = timeLeft <= 10 ? '#ef4444' : '#facc15';
+        ctx.fillText(`⏱ ${timeLeft}s`, 8, 18);
       }
 
       // Combo indicator
@@ -764,17 +1044,31 @@
         ctx.strokeRect(2, 2, canvas.width-4, canvas.height-4);
       }
 
+      // Darkness fog-of-war
+      if (darkMode && snake && snake.length > 0 && !gameOver) {
+        const hx = snake[0].x * CELL + CELL/2;
+        const hy = snake[0].y * CELL + CELL/2;
+        const radius = CELL * 4.5;
+        const fog = ctx.createRadialGradient(hx, hy, radius*0.5, hx, hy, radius);
+        fog.addColorStop(0, 'rgba(0,0,0,0)');
+        fog.addColorStop(1, 'rgba(0,0,0,0.97)');
+        ctx.fillStyle = fog;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
       ctx.restore();
     }
 
-    function drawSnakeBody(snk, d, t, dying, shld, accentCol) {
+    function drawSnakeBody(snk, d, t, dying, shld, accentCol, isPlayer1 = false) {
+      const bodyRgb  = isPlayer1 ? customSnakeRgb : t.body;
+      const headCol  = isPlayer1 ? customHead : t.head;
       snk.forEach((seg, i) => {
         if (dying) {
           ctx.fillStyle = i % 2 === 0 ? '#ef4444' : '#7f1d1d';
         } else if (shld) {
           ctx.fillStyle = i === 0 ? '#c4b5fd' : `rgba(167,139,250,${Math.max(0.4, 1 - i/snk.length*0.6)})`;
         } else {
-          ctx.fillStyle = i === 0 ? t.head : `rgba(${t.body},${Math.max(0.4, 1 - i/snk.length*0.6)})`;
+          ctx.fillStyle = i === 0 ? headCol : `rgba(${bodyRgb},${Math.max(0.4, 1 - i/snk.length*0.6)})`;
         }
         if (i === 0 && !dying) {
           // Head squash/stretch in direction of travel
@@ -877,6 +1171,15 @@
       ctx.fillStyle = '#0f0f1a';
       ctx.font = 'bold 15px Courier New';
       ctx.fillText('PLAY AGAIN', canvas.width/2, by+23);
+
+      // Share / score card button
+      ctx.fillStyle = '#1e1e3a';
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(canvas.width/2 - 40, by+42, 80, 22, 4); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#aaa';
+      ctx.font = '11px Courier New';
+      ctx.fillText('SHARE SCORE', canvas.width/2, by+57);
+
       ctx.textAlign = 'left';
     }
 
@@ -896,6 +1199,29 @@
       mazeMode = !mazeMode;
       mazeBtn.textContent = `MAZE: ${mazeMode ? 'ON' : 'OFF'}`;
       init();
+    });
+
+    aiBtn.addEventListener('click', () => {
+      aiMode = !aiMode;
+      aiBtn.textContent = `AI: ${aiMode ? 'ON' : 'OFF'}`;
+      init();
+    });
+
+    portalBtn.addEventListener('click', () => {
+      portalsOn = !portalsOn;
+      portalBtn.textContent = `PORTALS: ${portalsOn ? 'ON' : 'OFF'}`;
+      init();
+    });
+
+    timeBtn.addEventListener('click', () => {
+      timeAttack = !timeAttack;
+      timeBtn.textContent = `TIME: ${timeAttack ? 'ON' : 'OFF'}`;
+      init();
+    });
+
+    darkBtn.addEventListener('click', () => {
+      darkMode = !darkMode;
+      darkBtn.textContent = `DARK: ${darkMode ? 'ON' : 'OFF'}`;
     });
 
     themeBtn.addEventListener('click', () => {
@@ -981,6 +1307,9 @@
       });
       const bx = canvas.width/2 - 70, by = 356;
       if (mx >= bx && mx <= bx+140 && my >= by && my <= by+34) init();
+      // Share button
+      const sbx = canvas.width/2 - 40, sby = by+42;
+      if (mx >= sbx && mx <= sbx+80 && my >= sby && my <= sby+22) downloadScoreCard();
     });
 
     // D-pad
