@@ -8,7 +8,8 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      background: #1a1a2e;
+      background: #0d0d1a;
+      background-image: radial-gradient(ellipse 90% 60% at 50% 0%, #1a1a40 0%, #0d0d1a 70%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -18,28 +19,43 @@
       color: #eee;
     }
     h1 {
-      font-size: 2rem;
-      letter-spacing: 0.2em;
+      font-size: 2.2rem;
+      letter-spacing: 0.25em;
       color: var(--accent, #4ade80);
-      margin-bottom: 10px;
+      margin-bottom: 4px;
       text-transform: uppercase;
       transition: color 0.3s;
+      text-shadow: 0 0 20px var(--glow, rgba(74,222,128,0.5));
     }
     #scoreboard {
       display: flex;
-      gap: 40px;
-      margin-bottom: 6px;
-      font-size: 1rem;
-      letter-spacing: 0.1em;
+      gap: 32px;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      color: #888;
     }
-    #scoreboard span { color: var(--accent, #4ade80); font-weight: bold; }
+    #scoreboard span {
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.1rem;
+      display: inline-block;
+      transition: transform 0.1s;
+    }
+    @keyframes scorePop {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.7); color: var(--accent, #4ade80); }
+      100% { transform: scale(1); }
+    }
+    #score.pop { animation: scorePop 0.22s ease-out; }
     #settings-panel {
       width: 400px;
-      background: #12122a;
+      background: rgba(15,15,35,0.8);
       border: 1px solid #2a2a4a;
-      border-radius: 6px;
-      padding: 8px 12px 10px;
+      border-radius: 8px;
+      padding: 9px 12px 11px;
       margin-bottom: 8px;
+      backdrop-filter: blur(4px);
     }
     #settings-label {
       font-size: 0.6rem;
@@ -266,6 +282,7 @@
     let needsStart = true; // wait for first user gesture before playing audio
     let combo = 1, comboTimer = null, comboAlpha = 0;
     let toastQueue = [];
+    let scorePopups = [];
     let snakeAI, dirAI, nextDirAI;
     let portals = [];
     let timeLeft = 60, timeInterval = null;
@@ -426,7 +443,7 @@
       updateStaminaBar();
       combo = 1; comboAlpha = 0;
       if (comboTimer) { clearTimeout(comboTimer); comboTimer = null; }
-      boostUses = 0; powerUpsCollected = 0; toastQueue = [];
+      boostUses = 0; powerUpsCollected = 0; toastQueue = []; scorePopups = [];
       highScore = parseInt(localStorage.getItem('snakeHigh') || '0');
       scoreEl.textContent = score;
       highScoreEl.textContent = highScore;
@@ -725,6 +742,15 @@
       }
     }
 
+    function spawnScorePopup(x, y, text, color = '#fff') {
+      scorePopups.push({ x: x*CELL+CELL/2, y: y*CELL - 2, text, color, alpha: 1, vy: -0.9 });
+    }
+    function bumpScore() {
+      scoreEl.classList.remove('pop');
+      void scoreEl.offsetWidth;
+      scoreEl.classList.add('pop');
+    }
+
     function updateParticles() {
       particles = particles.filter(p => p.alpha > 0.05);
       particles.forEach(p => {
@@ -840,6 +866,8 @@
       if (comboAlpha > 0) comboAlpha = Math.max(0, comboAlpha - 0.015);
       toastQueue.forEach(t => t.alpha = Math.max(0, t.alpha - 0.008));
       toastQueue = toastQueue.filter(t => t.alpha > 0);
+      scorePopups.forEach(p => { p.y += p.vy; p.alpha -= 0.022; });
+      scorePopups = scorePopups.filter(p => p.alpha > 0);
       if (flashFrames > 0) flashFrames--;
       draw();
     }
@@ -853,11 +881,13 @@
         comboAlpha = 1;
         comboTimer = setTimeout(() => { combo = 1; comboTimer = null; comboAlpha = 0; }, 3000);
         score += 10 * combo;
+        spawnScorePopup(head.x, head.y, `+${10 * combo}`, THEMES[themeIdx].accent);
         combo = Math.min(combo + 1, 8);
         foodCount++;
         checkMilestone(score);
         checkAchievements();
         scoreEl.textContent = score;
+        bumpScore();
         if (score > highScore) {
           highScore = score;
           localStorage.setItem('snakeHigh', highScore);
@@ -878,8 +908,10 @@
       if (eidx !== -1) {
         const ef = extraFoods[eidx];
         score += ef.pts * combo;
+        spawnScorePopup(head.x, head.y, `+${ef.pts * combo}`, ef.color);
         checkMilestone(score); checkAchievements();
         scoreEl.textContent = score;
+        bumpScore();
         if (score > highScore) { highScore = score; localStorage.setItem('snakeHigh', highScore); highScoreEl.textContent = highScore; }
         spawnParticles(head.x, head.y, ef.color);
         playEat();
@@ -982,13 +1014,12 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // Grid
-      ctx.strokeStyle = t.grid; ctx.lineWidth = 0.5;
+      // Dot grid
+      ctx.fillStyle = t.grid;
       for (let x = 0; x <= COLS; x++) {
-        ctx.beginPath(); ctx.moveTo(x*CELL,0); ctx.lineTo(x*CELL,canvas.height); ctx.stroke();
-      }
-      for (let y = 0; y <= ROWS; y++) {
-        ctx.beginPath(); ctx.moveTo(0,y*CELL); ctx.lineTo(canvas.width,y*CELL); ctx.stroke();
+        for (let y = 0; y <= ROWS; y++) {
+          ctx.beginPath(); ctx.arc(x*CELL, y*CELL, 0.75, 0, Math.PI*2); ctx.fill();
+        }
       }
 
       // Portals
@@ -1013,14 +1044,19 @@
         ctx.beginPath(); ctx.roundRect(o.x*CELL+1, o.y*CELL+1, CELL-2, CELL-2, 2); ctx.fill();
         ctx.fillStyle = '#4b5563';
         ctx.fillRect(o.x*CELL+4, o.y*CELL+4, CELL-8, CELL-8);
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.fillRect(o.x*CELL+2, o.y*CELL+2, CELL-4, 3);
       });
 
-      // Food (with wobble)
+      // Food (with wobble + glow)
       const wobble = Math.sin(Date.now() / 220) * 1.2;
+      ctx.shadowColor = '#ef4444';
+      ctx.shadowBlur = 14;
       ctx.fillStyle = '#ef4444';
       ctx.beginPath();
       ctx.ellipse(food.x*CELL+CELL/2, food.y*CELL+CELL/2, CELL/2-2+wobble, CELL/2-2-wobble*0.5, 0, 0, Math.PI*2);
       ctx.fill();
+      ctx.shadowBlur = 0;
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.beginPath();
       ctx.arc(food.x*CELL+CELL/2-3, food.y*CELL+CELL/2-3, 3, 0, Math.PI*2);
@@ -1056,11 +1092,14 @@
       if (powerUp) {
         const col = powerUpColor(powerUp.type);
         const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 200);
+        ctx.shadowColor = col;
+        ctx.shadowBlur = 16;
         ctx.fillStyle = col;
         ctx.globalAlpha = pulse;
         ctx.beginPath();
         ctx.roundRect(powerUp.x*CELL+2, powerUp.y*CELL+2, CELL-4, CELL-4, 4);
         ctx.fill();
+        ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 11px Courier New';
@@ -1084,6 +1123,17 @@
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
       });
       ctx.globalAlpha = 1;
+
+      // Score popups
+      scorePopups.forEach(p => {
+        ctx.globalAlpha = p.alpha;
+        ctx.font = 'bold 13px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.x, p.y);
+      });
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'left';
 
       // Milestone
       if (milestone && milestone.alpha > 0) {
@@ -1135,6 +1185,16 @@
         ctx.globalAlpha = 1;
       });
 
+      // Vignette
+      const vign = ctx.createRadialGradient(
+        canvas.width/2, canvas.height/2, canvas.width * 0.28,
+        canvas.width/2, canvas.height/2, canvas.width * 0.72
+      );
+      vign.addColorStop(0, 'rgba(0,0,0,0)');
+      vign.addColorStop(1, 'rgba(0,0,0,0.4)');
+      ctx.fillStyle = vign;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
       // Shield indicator
       if (shielded) {
         ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 3;
@@ -1159,6 +1219,27 @@
     function drawSnakeBody(snk, d, t, dying, shld, accentCol, isPlayer1 = false) {
       const bodyRgb  = isPlayer1 ? customSnakeRgb : t.body;
       const headCol  = isPlayer1 ? customHead : t.head;
+
+      // Body connectors (drawn behind segments for a smooth connected look)
+      if (!dying) {
+        for (let i = 0; i < snk.length - 1; i++) {
+          const a = snk[i], b = snk[i+1];
+          if (Math.abs(a.x-b.x) + Math.abs(a.y-b.y) !== 1) continue;
+          const alpha = Math.max(0.28, 0.6 - i/snk.length*0.32);
+          ctx.fillStyle = shld
+            ? `rgba(167,139,250,${alpha})`
+            : `rgba(${bodyRgb},${alpha})`;
+          const ax = a.x*CELL + CELL/2, ay = a.y*CELL + CELL/2;
+          const bx = b.x*CELL + CELL/2, by = b.y*CELL + CELL/2;
+          const W = 10;
+          if (a.x === b.x) {
+            ctx.fillRect(ax - W/2, Math.min(ay,by), W, Math.abs(ay-by));
+          } else {
+            ctx.fillRect(Math.min(ax,bx), ay - W/2, Math.abs(ax-bx), W);
+          }
+        }
+      }
+
       snk.forEach((seg, i) => {
         if (dying) {
           ctx.fillStyle = i % 2 === 0 ? '#ef4444' : '#7f1d1d';
@@ -1168,6 +1249,9 @@
           ctx.fillStyle = i === 0 ? headCol : `rgba(${bodyRgb},${Math.max(0.4, 1 - i/snk.length*0.6)})`;
         }
         if (i === 0 && !dying) {
+          // Head glow
+          ctx.shadowColor = headCol;
+          ctx.shadowBlur = 10;
           // Head squash/stretch in direction of travel
           const stretch = 2.5;
           const sx = d.x !== 0 ? stretch : -stretch * 0.5;
@@ -1175,6 +1259,7 @@
           ctx.beginPath();
           ctx.roundRect(seg.x*CELL+1-sx, seg.y*CELL+1-sy, CELL-2+sx*2, CELL-2+sy*2, 4);
           ctx.fill();
+          ctx.shadowBlur = 0;
         } else {
           const pad = i === 0 ? 1 : 2;
           ctx.beginPath();
