@@ -101,28 +101,30 @@
     }
     #dpad {
       display: none;
-      margin-top: 16px;
-      position: relative;
-      width: 120px;
-      height: 120px;
+      margin-top: 12px;
+      grid-template-columns: repeat(3, var(--dpad-btn, 48px));
+      grid-template-rows: repeat(3, var(--dpad-btn, 48px));
+      gap: 5px;
     }
     #dpad button {
-      position: absolute;
-      width: 36px; height: 36px;
-      background: #1e1e3a;
+      width: var(--dpad-btn, 48px);
+      height: var(--dpad-btn, 48px);
+      background: rgba(30,30,58,0.85);
       border: 1px solid var(--accent, #4ade80);
-      border-radius: 6px;
+      border-radius: 8px;
       color: var(--accent, #4ade80);
-      font-size: 1rem;
+      font-size: 1.2rem;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       user-select: none; -webkit-user-select: none;
+      touch-action: none;
     }
     #dpad button:active { background: #2a2a5a; }
-    #btn-up    { top: 0;    left: 42px; }
-    #btn-down  { bottom: 0; left: 42px; }
-    #btn-left  { top: 42px; left: 0; }
-    #btn-right { top: 42px; right: 0; }
+    #btn-up     { grid-column: 2; grid-row: 1; }
+    #btn-left   { grid-column: 1; grid-row: 2; }
+    #btn-sprint { grid-column: 2; grid-row: 2; font-size: 0.5rem; letter-spacing: 0.04em; color: #facc15; border-color: rgba(250,204,21,0.5); }
+    #btn-right  { grid-column: 3; grid-row: 2; }
+    #btn-down   { grid-column: 2; grid-row: 3; }
     #instructions { margin-top: 8px; font-size: 0.68rem; color: #999; letter-spacing: 0.05em; }
     #stamina-wrap {
       margin-top: 7px;
@@ -172,8 +174,9 @@
     }
     .swatch:hover { transform: scale(1.2); }
     .swatch.active { border-color: #fff; }
+    canvas { touch-action: none; }
     @media (hover: none) and (pointer: coarse) {
-      #dpad { display: block; }
+      #dpad { display: grid; }
       #instructions { display: none; }
     }
   </style>
@@ -208,6 +211,7 @@
   <div id="dpad">
     <button id="btn-up">▲</button>
     <button id="btn-left">◀</button>
+    <button id="btn-sprint">SPRINT</button>
     <button id="btn-right">▶</button>
     <button id="btn-down">▼</button>
   </div>
@@ -353,6 +357,14 @@
         picker.appendChild(sw);
       });
     })();
+
+    // AI color: never the same as the player's chosen color
+    const AI_COLORS = ['#f97316','#e11d48','#06b6d4','#8b5cf6'];
+    function getAIColor() {
+      const playerHex = '#' + customSnakeRgb.split(',')
+        .map(n => parseInt(n).toString(16).padStart(2,'0')).join('');
+      return AI_COLORS.find(c => c !== playerHex) || '#f97316';
+    }
 
     // ── Audio ─────────────────────────────────────────────────────
     let audioCtx;
@@ -741,7 +753,7 @@
       snakeAI.unshift(aiHead);
       if (aiHead.x === food.x && aiHead.y === food.y) {
         spawnFood(); playEat(); flashFrames = 2;
-        spawnParticles(aiHead.x, aiHead.y, '#f97316');
+        spawnParticles(aiHead.x, aiHead.y, getAIColor());
       } else {
         snakeAI.pop();
       }
@@ -1224,7 +1236,7 @@
       const dying = deathFrames > 0;
       drawSnakeBody(snake, dir, t, dying, shielded, t.accent, true);
       if (twoPlayer) drawSnakeBody(snake2, dir2, t, dying && winner === 'P1', shield2, '#38bdf8');
-      if (aiMode && snakeAI) drawSnakeBody(snakeAI, dirAI, t, false, false, '#f97316');
+      if (aiMode && snakeAI) drawSnakeBody(snakeAI, dirAI, t, false, false, getAIColor());
 
       // Particles
       particles.forEach(p => {
@@ -1655,6 +1667,27 @@
     document.getElementById('btn-down').addEventListener('touchstart',  e => { e.preventDefault(); pressDir(0,1);  }, {passive:false});
     document.getElementById('btn-left').addEventListener('touchstart',  e => { e.preventDefault(); pressDir(-1,0); }, {passive:false});
     document.getElementById('btn-right').addEventListener('touchstart', e => { e.preventDefault(); pressDir(1,0);  }, {passive:false});
+    // Sprint button: hold to boost
+    const btnSprint = document.getElementById('btn-sprint');
+    btnSprint.addEventListener('touchstart', e => { e.preventDefault(); if (!gameOver && !paused) shiftHeld = true;  }, {passive:false});
+    btnSprint.addEventListener('touchend',   e => { e.preventDefault(); shiftHeld = false; }, {passive:false});
+
+    // Swipe gestures on canvas
+    let _swipeX = 0, _swipeY = 0;
+    canvas.addEventListener('touchstart', e => {
+      _swipeX = e.touches[0].clientX;
+      _swipeY = e.touches[0].clientY;
+      if (needsStart) onFirstGesture();
+    }, {passive:true});
+    canvas.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - _swipeX;
+      const dy = e.changedTouches[0].clientY - _swipeY;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+      let nd;
+      if (Math.abs(dx) > Math.abs(dy)) nd = dx > 0 ? {x:1,y:0} : {x:-1,y:0};
+      else                              nd = dy > 0 ? {x:0,y:1} : {x:0,y:-1};
+      if (nd.x !== -dir.x || nd.y !== -dir.y) nextDir = nd;
+    }, {passive:true});
 
     // Idle animation loop (food wobble, power-up pulse redraw)
     function idleDraw() {
@@ -1682,11 +1715,13 @@
       const belowH = 100;
       const pad    = 32;
 
+      const isMobile = window.innerWidth <= 600;
       const availW = window.innerWidth  - pad;
       const availH = window.innerHeight - aboveH - belowH - pad;
-      const size   = Math.min(availW, availH) * 0.75;
+      const scale  = isMobile ? 0.96 : 0.75;
+      const size   = Math.min(availW, availH) * scale;
 
-      CELL = Math.max(16, Math.min(44, Math.floor(size / COLS)));
+      CELL = Math.max(14, Math.min(44, Math.floor(size / COLS)));
       const px = CELL * COLS;
 
       canvas.width  = px;
@@ -1697,6 +1732,10 @@
       // Scale all rem-based UI text proportionally with canvas size
       const fs = Math.max(11, Math.min(22, px / 26));
       document.documentElement.style.fontSize = fs + 'px';
+
+      // Scale D-pad button size
+      const dpadBtn = Math.round(Math.min(px * 0.14, 60));
+      document.documentElement.style.setProperty('--dpad-btn', dpadBtn + 'px');
     }
 
     let _resizeTimer;
