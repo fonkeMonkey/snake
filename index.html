@@ -109,10 +109,22 @@
     }
     #stamina-label {
       font-size: 0.62rem;
-      color: #555;
+      color: #666;
       letter-spacing: 0.06em;
       margin-bottom: 3px;
       transition: color 0.15s;
+    }
+    #shift-key {
+      display: inline-block;
+      background: #2a2a4a;
+      border: 1px solid #555;
+      border-bottom: 2px solid #333;
+      border-radius: 3px;
+      padding: 0 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.62rem;
+      color: #ccc;
+      line-height: 1.5;
     }
     #stamina-track {
       background: #1e1e3a;
@@ -169,7 +181,7 @@
   </div>
   <canvas id="game" width="400" height="400"></canvas>
   <div id="stamina-wrap">
-    <div id="stamina-label">BOOST [SHIFT]</div>
+    <div id="stamina-label">SPRINT — <span style="color:#888">hold</span> <kbd id="shift-key">SHIFT</kbd> <span style="color:#555">to boost speed</span></div>
     <div id="stamina-track"><div id="stamina-fill"></div></div>
   </div>
   <div id="color-picker"></div>
@@ -324,8 +336,19 @@
     let audioCtx;
     function getAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Resume if suspended (browser blocks audio until first user gesture)
+      if (audioCtx.state === 'suspended') audioCtx.resume();
       return audioCtx;
     }
+    // Unlock audio on first interaction so countdown beep works on game 1
+    function unlockAudio() {
+      getAudio();
+      document.removeEventListener('keydown', unlockAudio);
+      document.removeEventListener('pointerdown', unlockAudio);
+    }
+    document.addEventListener('keydown', unlockAudio);
+    document.addEventListener('pointerdown', unlockAudio);
+
     function playTone(freq1, freq2, dur, type = 'sine', vol = 0.15) {
       try {
         const ac = getAudio();
@@ -362,7 +385,7 @@
       const label = document.getElementById('stamina-label');
       fill.style.width = stamina + '%';
       fill.style.background = stamina > 60 ? '#facc15' : stamina > 25 ? '#f97316' : '#ef4444';
-      label.style.color = (shiftHeld && stamina > 0) ? '#facc15' : '#555';
+      label.style.color = (shiftHeld && stamina > 0) ? '#facc15' : '#666';
     }
 
     // ── Init ──────────────────────────────────────────────────────
@@ -1115,6 +1138,11 @@
       ctx.fillStyle = THEMES[themeIdx].accent;
       ctx.font = `bold ${n === 0 ? 60 : 80}px Courier New`;
       ctx.fillText(n === 0 ? 'GO!' : n, canvas.width/2, canvas.height/2 + 28);
+      if (n > 0) {
+        ctx.fillStyle = '#555';
+        ctx.font = '11px Courier New';
+        ctx.fillText('hold SHIFT to sprint', canvas.width/2, canvas.height/2 + 58);
+      }
       ctx.textAlign = 'left';
     }
 
