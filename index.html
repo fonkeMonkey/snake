@@ -1098,6 +1098,9 @@
     }
 
     // ── Draw ──────────────────────────────────────────────────────
+    // Scale a canvas font size relative to reference 500px canvas height
+    function cf(n) { return Math.round(n * canvas.height / 500); }
+
     function draw() {
       if (!food) return; // not yet initialized
       const t = THEMES[themeIdx];
@@ -1190,7 +1193,7 @@
           ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill();
         }
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.font = 'bold 10px Courier New'; ctx.textAlign = 'center';
+        ctx.font = `bold ${cf(10)}px Courier New`; ctx.textAlign = 'center';
         ctx.fillText(`+${ef.pts}`, cx, cy + 4);
         ctx.textAlign = 'left';
       });
@@ -1209,7 +1212,7 @@
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
         ctx.fillStyle = '#fff';
-        ctx.font = 'bold 11px Courier New';
+        ctx.font = `bold ${cf(11)}px Courier New`;
         ctx.textAlign = 'center';
         const puIcon = { slow:'S', bonus:'$', shield:'★', shrink:'↓' };
         ctx.fillText(puIcon[powerUp.type] || '?',
@@ -1234,7 +1237,7 @@
       // Score popups
       scorePopups.forEach(p => {
         ctx.globalAlpha = p.alpha;
-        ctx.font = 'bold 13px Courier New';
+        ctx.font = `bold ${cf(13)}px Courier New`;
         ctx.textAlign = 'center';
         ctx.fillStyle = p.color;
         ctx.fillText(p.text, p.x, p.y);
@@ -1246,9 +1249,9 @@
       if (milestone && milestone.alpha > 0) {
         ctx.globalAlpha = milestone.alpha;
         ctx.textAlign = 'center';
-        ctx.font = 'bold 28px Courier New';
+        ctx.font = `bold ${cf(28)}px Courier New`;
         ctx.fillStyle = '#facc15';
-        ctx.fillText(milestone.text, canvas.width/2, canvas.height/2 - 20);
+        ctx.fillText(milestone.text, canvas.width/2, canvas.height/2 - cf(20));
         ctx.globalAlpha = 1;
         ctx.textAlign = 'left';
       }
@@ -1256,18 +1259,18 @@
       // Time attack timer
       if (timeAttack && !gameOver && countdownVal === null) {
         ctx.textAlign = 'left';
-        ctx.font = 'bold 13px Courier New';
+        ctx.font = `bold ${cf(13)}px Courier New`;
         ctx.fillStyle = timeLeft <= 10 ? '#ef4444' : '#facc15';
-        ctx.fillText(`⏱ ${timeLeft}s`, 8, 18);
+        ctx.fillText(`⏱ ${timeLeft}s`, cf(8), cf(18));
       }
 
       // Combo indicator
       if (combo > 1 && comboAlpha > 0) {
         ctx.globalAlpha = comboAlpha;
         ctx.textAlign = 'right';
-        ctx.font = `bold ${16 + combo * 2}px Courier New`;
+        ctx.font = `bold ${cf(16 + combo * 2)}px Courier New`;
         ctx.fillStyle = '#facc15';
-        ctx.fillText(`×${combo} COMBO`, canvas.width - 8, 22);
+        ctx.fillText(`×${combo} COMBO`, canvas.width - cf(8), cf(22));
         ctx.globalAlpha = 1;
         ctx.textAlign = 'left';
       }
@@ -1280,14 +1283,14 @@
 
       // Achievement toasts
       toastQueue.forEach((t, i) => {
-        const y = canvas.height - 30 - i * 28;
+        const y = canvas.height - cf(30) - i * cf(28);
         ctx.globalAlpha = t.alpha;
         ctx.fillStyle = 'rgba(0,0,0,0.75)';
-        ctx.beginPath(); ctx.roundRect(8, y - 14, canvas.width - 16, 22, 4); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(cf(8), y - cf(14), canvas.width - cf(16), cf(22), 4); ctx.fill();
         ctx.fillStyle = '#facc15';
-        ctx.font = 'bold 11px Courier New';
+        ctx.font = `bold ${cf(11)}px Courier New`;
         ctx.textAlign = 'center';
-        ctx.fillText(t.msg, canvas.width / 2, y + 2);
+        ctx.fillText(t.msg, canvas.width / 2, y + cf(2));
         ctx.textAlign = 'left';
         ctx.globalAlpha = 1;
       });
@@ -1388,12 +1391,12 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.textAlign = 'center';
       ctx.fillStyle = THEMES[themeIdx].accent;
-      ctx.font = `bold ${n === 0 ? 60 : 80}px Courier New`;
-      ctx.fillText(n === 0 ? 'GO!' : n, canvas.width/2, canvas.height/2 + 28);
+      ctx.font = `bold ${cf(n === 0 ? 60 : 80)}px Courier New`;
+      ctx.fillText(n === 0 ? 'GO!' : n, canvas.width/2, canvas.height/2 + cf(28));
       if (n > 0) {
         ctx.fillStyle = '#aaa';
-        ctx.font = '12px Courier New';
-        ctx.fillText('hold SHIFT to sprint', canvas.width/2, canvas.height/2 + 60);
+        ctx.font = `${cf(12)}px Courier New`;
+        ctx.fillText('hold SHIFT to sprint', canvas.width/2, canvas.height/2 + cf(60));
       }
       ctx.textAlign = 'left';
     }
@@ -1403,11 +1406,11 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.textAlign = 'center';
       ctx.fillStyle = THEMES[themeIdx].accent;
-      ctx.font = 'bold 48px Courier New';
-      ctx.fillText('SNAKE', canvas.width/2, canvas.height/2 - 18);
+      ctx.font = `bold ${cf(48)}px Courier New`;
+      ctx.fillText('SNAKE', canvas.width/2, canvas.height/2 - cf(18));
       ctx.fillStyle = '#ccc';
-      ctx.font = '14px Courier New';
-      ctx.fillText('PRESS ANY KEY OR CLICK TO START', canvas.width/2, canvas.height/2 + 22);
+      ctx.font = `${cf(14)}px Courier New`;
+      ctx.fillText('PRESS ANY KEY OR CLICK TO START', canvas.width/2, canvas.height/2 + cf(22));
       ctx.textAlign = 'left';
     }
 
@@ -1416,11 +1419,11 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.textAlign = 'center';
       ctx.fillStyle = '#eee';
-      ctx.font = 'bold 40px Courier New';
+      ctx.font = `bold ${cf(40)}px Courier New`;
       ctx.fillText('PAUSED', canvas.width/2, canvas.height/2);
-      ctx.font = '14px Courier New';
+      ctx.font = `${cf(14)}px Courier New`;
       ctx.fillStyle = '#888';
-      ctx.fillText('P or ESC to resume', canvas.width/2, canvas.height/2 + 30);
+      ctx.fillText('P or ESC to resume', canvas.width/2, canvas.height/2 + cf(30));
       ctx.textAlign = 'left';
     }
 
