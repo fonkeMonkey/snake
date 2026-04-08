@@ -74,6 +74,7 @@
       highScoreEl.textContent = highScore;
       spawnFood();
       if (intervalId) clearInterval(intervalId);
+      draw();
       intervalId = setInterval(tick, BASE_SPEED);
     }
 
