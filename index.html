@@ -119,6 +119,32 @@
       gameOver = true;
       clearInterval(intervalId);
       draw();
+      drawOverlay();
+    }
+
+    function drawOverlay() {
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ef4444';
+      ctx.font = 'bold 36px Courier New';
+      ctx.fillText('GAME OVER', canvas.width/2, 155);
+
+      ctx.fillStyle = '#eee';
+      ctx.font = '18px Courier New';
+      ctx.fillText(`Score: ${score}`, canvas.width/2, 200);
+      ctx.fillText(`Best:  ${highScore}`, canvas.width/2, 225);
+
+      const bx = canvas.width/2 - 70, by = 255, bw = 140, bh = 36;
+      ctx.fillStyle = '#4ade80';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 6);
+      ctx.fill();
+      ctx.fillStyle = '#0f0f1a';
+      ctx.font = 'bold 16px Courier New';
+      ctx.fillText('PLAY AGAIN', canvas.width/2, by + 24);
+      ctx.textAlign = 'left';
     }
 
     function draw() {
@@ -165,6 +191,7 @@
     }
 
     document.addEventListener('keydown', e => {
+      if (gameOver && (e.key === 'Enter' || e.key === ' ')) { init(); return; }
       const map = {
         ArrowUp:    { x: 0, y: -1 }, w: { x: 0, y: -1 }, W: { x: 0, y: -1 },
         ArrowDown:  { x: 0, y:  1 }, s: { x: 0, y:  1 }, S: { x: 0, y:  1 },
@@ -176,6 +203,14 @@
         nextDir = d;
         if (e.key.startsWith('Arrow')) e.preventDefault();
       }
+    });
+
+    canvas.addEventListener('click', e => {
+      if (!gameOver) return;
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const bx = canvas.width/2 - 70, by = 255;
+      if (mx >= bx && mx <= bx + 140 && my >= by && my <= by + 36) init();
     });
 
     init();
