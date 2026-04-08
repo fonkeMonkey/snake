@@ -570,13 +570,19 @@
         }
       }
     }
-    function checkPortal(nx, ny, snk) {
+    function checkPortal(nx, ny, dx, dy) {
       const portal = portals.find(p => p.x === nx && p.y === ny);
       if (!portal) return null;
       const exit = portals.find(p => p.pair === portal.pair && p.side !== portal.side);
       if (!exit) return null;
-      // Place exiting 1 step beyond exit portal in current direction
-      return { x: exit.x, y: exit.y };
+      // Exit one cell beyond the exit portal in the direction of travel
+      let ex = exit.x + dx, ey = exit.y + dy;
+      if (!wallsOn) { ex = (ex + COLS) % COLS; ey = (ey + ROWS) % ROWS; }
+      // If that step would hit a wall, land on the portal itself instead
+      if (wallsOn && (ex < 0 || ex >= COLS || ey < 0 || ey >= ROWS)) {
+        ex = exit.x; ey = exit.y;
+      }
+      return { x: ex, y: ey };
     }
 
     // ── Time Attack ───────────────────────────────────────────────
@@ -675,6 +681,14 @@
     function moveSnake(snk, d, isP1) {
       let nx = snk[0].x + d.x, ny = snk[0].y + d.y;
       const shld = isP1 ? shielded : shield2;
+
+      // Portal check BEFORE wall check — portals never kill directly
+      const teleport = checkPortal(nx, ny, d.x, d.y);
+      if (teleport) {
+        snk.unshift(teleport);
+        return teleport;
+      }
+
       if (wallsOn) {
         if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
           if (shld) { if (isP1) shielded = false; else shield2 = false; return 'bounce'; }
@@ -683,9 +697,6 @@
       } else {
         nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS;
       }
-      // Portal teleport
-      const teleport = checkPortal(nx, ny, snk);
-      if (teleport) { nx = teleport.x; ny = teleport.y; }
 
       const head = { x: nx, y: ny };
       if (snk.some(s => s.x === nx && s.y === ny)) {
