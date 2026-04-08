@@ -54,3 +54,45 @@
 - Toggle button to switch between "walls kill" and "wrap around" modes
 - In wrap mode, snake exits one edge and enters the opposite
 - Toggle persists across restarts, visible in the UI
+
+## Feature 12: Pause
+- Press P or Escape to pause/resume mid-game
+- Dim overlay with "PAUSED" text shown while paused
+
+## Feature 13: Power-ups
+- Three types: slow time (blue), bonus points (gold), shield (purple)
+- Appear randomly for a limited duration, then despawn
+- Shield lets snake survive one wall/self collision
+
+## Feature 14: Obstacles
+- Static wall segments spawned on the grid as difficulty increases
+- More obstacles appear at higher food counts
+- Collision with obstacles triggers game over (unless shielded)
+
+## Feature 15: Particle Burst
+- Small colored particles explode outward from food on eat
+- Particles fade and shrink over ~400ms using requestAnimationFrame
+
+## Feature 16: Countdown Start
+- 3-2-1-GO! countdown on the canvas before snake starts moving
+- Snake is visible but frozen during countdown
+
+## Feature 17: Theme Selector
+- Four color themes: Neon (default), Retro Green, Fire, Ice
+- Theme toggle button cycles through options, updates all colors live
+- Persists in localStorage
+
+## Feature 18: Local Leaderboard
+- Top 5 scores with initials stored in localStorage
+- Prompt for initials on game over if score qualifies
+- Leaderboard shown on game over screen
+
+## Feature 19: Milestones
+- Brief animated message on screen at 50, 100, 200+ point thresholds
+- Messages: "Nice!", "On fire!", "Unstoppable!", etc.
+- Fades out after 1.5s without interrupting gameplay
+
+## Feature 20: Two-Player Mode
+- Two snakes: Player 1 (WASD, green) and Player 2 (arrows, blue)
+- Both on same canvas, last alive wins
+- Round winner shown on game over overlay
